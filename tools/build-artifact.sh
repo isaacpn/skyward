@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 bash tools/build.sh > /dev/null
 mkdir -p dist
 
-grep -v -E '^<!doctype html>|^<html lang="en">|^<head>|^</head>|^<body>|^</body>|^</html>|^<meta ' index.html \
+grep -v -E '^<!doctype html>|^<html lang="en">|^<head>|^</head>|^<body>|^</body>|^</html>|^<meta |^<link ' index.html \
   | sed 's/^const EMBEDDED_ONLY = false;$/const EMBEDDED_ONLY = true;/' \
   > dist/skyward.html
 
