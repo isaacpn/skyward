@@ -16,6 +16,10 @@ Open `index.html` in a browser. That is the whole game.
 | Pause | `Esc` or `P` |
 | Mute | `M` |
 
+On touch, drag anywhere: the balloon steers toward your finger, so you can hold
+it low on the screen and still aim. The game pauses itself when the tab is
+hidden or loses focus, so a phone call does not cost you a run.
+
 The core skill is lateral speed. Climb rate scales with how fast you are moving
 sideways (up to +50%), and walls, hedges and laser lines drop with a single gap
 deliberately placed on the far side of the screen from where you are. Hesitating
@@ -23,6 +27,33 @@ costs altitude; committing early and crossing at full speed is the whole game.
 
 Stickers are lives. Each one patches exactly one prick, and a patch stays visible
 on the balloon skin. Run out and the next sharp thing pops you.
+
+## The play field adapts to the screen
+
+There is no fixed canvas. `Layout.apply()` reshapes the world to whatever
+viewport it lands in, and everything downstream reads scale factors instead of
+hard numbers.
+
+| Viewport | Field | Notes |
+| --- | --- | --- |
+| Desktop, at least 901px wide and 5:4 or wider | 800 x 600, framed | the field the levels were tuned on |
+| Phone portrait, 375 x 812 | 481 x 1002, full bleed | narrow world keeps sprites thumb-sized |
+| Phone landscape, 812 x 375 | 800 x 533, full bleed | short world, so hazard density is eased |
+| Tablet, small windows | in between | aspect follows the screen |
+
+- `kx` scales horizontal speeds, wind, drift and barrier gaps, so crossing the
+  screen takes the same time on every field.
+- `ky` scales fall speeds, so a hazard takes the same time to reach you.
+- `k` (`kx^0.45`) scales sprites, deliberately blunted: a strictly proportional
+  balloon would be 16px across on a phone.
+- `Game.computeEase()` compares balloon area against field area and thins the
+  spawn rate when a field is more crowded than the 800 x 600 baseline. A short
+  landscape phone gets about 13% fewer hazards; nothing ever gets denser than
+  baseline.
+
+Rotating the phone calls `Game.reflow()`, which rescales the live game in place
+(entities, barrier gaps, bolt columns, the player) rather than restarting, so a
+run survives an orientation change.
 
 ## Levels
 
@@ -121,6 +152,27 @@ bash tools/build.sh
 
 That concatenates the sources and splices every `levels/*.json` file into the
 `EMBEDDED_LEVELS` array so the page still works from `file://`.
+
+## Testing levels
+
+`tools/test-levels.js` plays every level with an avoidance bot and reports
+whether it is completable, how much damage it takes and whether anything threw.
+Open the game, paste the file into the console, then:
+
+```js
+await SkywardTest.run()                        // all levels, current viewport
+await SkywardTest.run({from: 8, to: 12, runs: 3})
+```
+
+It also lints each level: unknown sprite names, unknown barrier styles (which
+otherwise fall back silently to the laser look), barriers with no gap, and
+missing theme or altitude fields.
+
+Resize the window between runs to test a field shape. What a healthy ladder
+looks like: the bot clears levels 1-5 every time taking no damage, and drops to
+roughly half its runs by level 12 with four or five hits. If a mid-ladder level
+kills it every time, that level is leaning on undodgeable density rather than
+on skill.
 
 ## Toward a level designer
 

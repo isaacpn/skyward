@@ -17,10 +17,19 @@
     margin:0; background:#0b1424; color:var(--ink);
     font:14px/1.5 ui-rounded,"Nunito","Segoe UI Variable",Segoe UI,system-ui,sans-serif;
     display:flex; align-items:center; justify-content:center;
-    overflow:hidden; -webkit-user-select:none; user-select:none; touch-action:none;
+    overflow:hidden; overscroll-behavior:none;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    touch-action:none;
   }
-  #app{position:relative; width:min(100vw,calc(100vh * 4 / 3)); height:min(100vh,calc(100vw * 3 / 4));
-       box-shadow:var(--shadow); overflow:hidden; background:#8fd0f0}
+  /* Phones, tablets and small windows play full-bleed: the world itself is
+     reshaped to the viewport in Layout.apply(). Roomy landscape screens keep
+     the framed 4:3 field the levels were tuned against. */
+  #app{position:relative; width:100vw; height:100vh; height:100dvh;
+       overflow:hidden; background:#8fd0f0}
+  @media (min-width:901px) and (min-aspect-ratio:5/4){
+    #app{width:min(100vw,calc(100dvh * 4 / 3)); height:min(100dvh,calc(100vw * 3 / 4));
+         box-shadow:var(--shadow)}
+  }
   #stage{position:absolute; inset:0; width:100%; height:100%; display:block}
   .shake{animation:shake .32s ease}
   @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-7px,3px)}50%{transform:translate(6px,-4px)}75%{transform:translate(-4px,-2px)}}
@@ -29,7 +38,9 @@
   #hud{position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s}
   #hud.on{opacity:1}
   .hud-top{position:absolute; top:0; left:0; right:0; display:flex; align-items:flex-start;
-           justify-content:space-between; padding:12px 14px; gap:10px}
+           justify-content:space-between; gap:10px;
+           padding:calc(12px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right))
+                   12px calc(14px + env(safe-area-inset-left))}
   .chip{background:var(--panel); border-radius:14px; padding:7px 12px; backdrop-filter:blur(6px);
         box-shadow:0 6px 18px -8px rgba(10,25,50,.6); font-weight:800; letter-spacing:.2px}
   .chip small{display:block; font-weight:700; opacity:.55; font-size:10px; text-transform:uppercase; letter-spacing:.09em}
@@ -106,15 +117,55 @@
   .stat:last-of-type{border:0}
   .stat span:last-child{font-weight:900; text-align:right}
   .hintline{margin-top:14px; font-size:12px; opacity:.7; font-weight:700}
+
+  /* ---------- touch and small screens ---------- */
+  #rotate{display:none}
+  @media (pointer:coarse){
+    .btn-icon{width:44px; height:44px; font-size:18px}
+    .btn{padding:15px 26px}
+    .btn.small{padding:12px 18px}
+    .sw{width:44px; height:44px}
+    #speedWrap{bottom:calc(16px + env(safe-area-inset-bottom))}
+    #speedLabel{bottom:calc(28px + env(safe-area-inset-bottom))}
+    #altWrap{bottom:calc(30px + env(safe-area-inset-bottom))}
+  }
+  @media (max-width:900px){
+    .screen{padding:16px calc(16px + env(safe-area-inset-left)) calc(16px + env(safe-area-inset-bottom))
+                 calc(16px + env(safe-area-inset-right)); align-items:stretch}
+    .card{margin:auto; padding:20px}
+    #altWrap{top:120px}
+  }
   @media (max-width:620px){
-    h1{font-size:30px} .card{padding:18px}
-    .types{grid-template-columns:repeat(2,1fr)} .levels{grid-template-columns:repeat(3,1fr)}
+    h1{font-size:30px} h2{font-size:21px}
+    .card{padding:18px; border-radius:20px}
+    .types{grid-template-columns:repeat(2,1fr)}
+    .levels{grid-template-columns:repeat(3,1fr)}
+    #toast{font-size:20px}
+    .stat{font-size:13px}
+  }
+  @media (max-width:400px){
+    h1{font-size:26px}
+    .levels{grid-template-columns:repeat(2,1fr)}
+    .swatches{gap:8px}
+  }
+  /* very short landscape: the cards must not overflow the viewport */
+  @media (max-height:430px){
+    .card{padding:14px 18px; max-width:560px}
+    h1{font-size:24px; margin-bottom:2px} h2{font-size:19px; margin-bottom:8px}
+    .sub{margin-bottom:10px; font-size:12px}
+    .type svg{height:50px}
+    .row{margin-top:10px}
+    .keys{margin-top:8px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .shake{animation:none}
+    #toast.show{animation-duration:.9s}
   }
 </style>
 </head>
 <body>
 <div id="app">
-  <svg id="stage" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" aria-label="Skyward game">
+  <svg id="stage" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet" aria-label="Skyward game">
     <defs id="defs"></defs>
     <g id="lBg"></g>
     <g id="lParts"></g>
@@ -133,6 +184,7 @@
       <div class="hud-right">
         <div class="chip" style="text-align:right"><small>Score</small><span id="hudScore">0</span></div>
         <div style="display:flex;gap:6px">
+          <button class="btn-icon" id="btnFull" title="Fullscreen" hidden>&#9974;</button>
           <button class="btn-icon" id="btnMute" title="Sound">&#128266;</button>
           <button class="btn-icon" id="btnPause" title="Pause">&#10073;&#10073;</button>
         </div>

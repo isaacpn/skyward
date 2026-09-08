@@ -10,7 +10,7 @@
   "wind": { "base": -25, "gust": 110, "period": 4 },
   "theme": { "sky": ["#5c8f6a", "#dff0d8"], "light": "day", "sun": true, "particles": "dust", "cloudBands": 4, "flash": false },
   "spawners": [
-    { "sprite": "burr", "every": 0.85, "jitter": 0.3, "count": 2, "spread": 120, "props": { "speed": 60, "sway": { "amp": 95, "freq": 0.85 } } },
+    { "sprite": "burr", "every": 1.25, "jitter": 0.35, "count": 2, "spread": 120, "props": { "speed": 60, "sway": { "amp": 70, "freq": 0.7 } } },
     { "sprite": "twig", "every": 2, "jitter": 0.6, "props": { "speed": 90, "drift": 55 } },
     { "sprite": "updraft", "every": 6, "jitter": 1.5, "props": { "speed": -30, "lift": 55 } },
     { "sprite": "barrier", "from": 0.12, "every": 4.8, "jitter": 0.7, "props": { "style": "thorn", "gap": 150 } },

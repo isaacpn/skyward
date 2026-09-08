@@ -17,10 +17,19 @@
     margin:0; background:#0b1424; color:var(--ink);
     font:14px/1.5 ui-rounded,"Nunito","Segoe UI Variable",Segoe UI,system-ui,sans-serif;
     display:flex; align-items:center; justify-content:center;
-    overflow:hidden; -webkit-user-select:none; user-select:none; touch-action:none;
+    overflow:hidden; overscroll-behavior:none;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    touch-action:none;
   }
-  #app{position:relative; width:min(100vw,calc(100vh * 4 / 3)); height:min(100vh,calc(100vw * 3 / 4));
-       box-shadow:var(--shadow); overflow:hidden; background:#8fd0f0}
+  /* Phones, tablets and small windows play full-bleed: the world itself is
+     reshaped to the viewport in Layout.apply(). Roomy landscape screens keep
+     the framed 4:3 field the levels were tuned against. */
+  #app{position:relative; width:100vw; height:100vh; height:100dvh;
+       overflow:hidden; background:#8fd0f0}
+  @media (min-width:901px) and (min-aspect-ratio:5/4){
+    #app{width:min(100vw,calc(100dvh * 4 / 3)); height:min(100dvh,calc(100vw * 3 / 4));
+         box-shadow:var(--shadow)}
+  }
   #stage{position:absolute; inset:0; width:100%; height:100%; display:block}
   .shake{animation:shake .32s ease}
   @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-7px,3px)}50%{transform:translate(6px,-4px)}75%{transform:translate(-4px,-2px)}}
@@ -29,7 +38,9 @@
   #hud{position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s}
   #hud.on{opacity:1}
   .hud-top{position:absolute; top:0; left:0; right:0; display:flex; align-items:flex-start;
-           justify-content:space-between; padding:12px 14px; gap:10px}
+           justify-content:space-between; gap:10px;
+           padding:calc(12px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right))
+                   12px calc(14px + env(safe-area-inset-left))}
   .chip{background:var(--panel); border-radius:14px; padding:7px 12px; backdrop-filter:blur(6px);
         box-shadow:0 6px 18px -8px rgba(10,25,50,.6); font-weight:800; letter-spacing:.2px}
   .chip small{display:block; font-weight:700; opacity:.55; font-size:10px; text-transform:uppercase; letter-spacing:.09em}
@@ -106,15 +117,55 @@
   .stat:last-of-type{border:0}
   .stat span:last-child{font-weight:900; text-align:right}
   .hintline{margin-top:14px; font-size:12px; opacity:.7; font-weight:700}
+
+  /* ---------- touch and small screens ---------- */
+  #rotate{display:none}
+  @media (pointer:coarse){
+    .btn-icon{width:44px; height:44px; font-size:18px}
+    .btn{padding:15px 26px}
+    .btn.small{padding:12px 18px}
+    .sw{width:44px; height:44px}
+    #speedWrap{bottom:calc(16px + env(safe-area-inset-bottom))}
+    #speedLabel{bottom:calc(28px + env(safe-area-inset-bottom))}
+    #altWrap{bottom:calc(30px + env(safe-area-inset-bottom))}
+  }
+  @media (max-width:900px){
+    .screen{padding:16px calc(16px + env(safe-area-inset-left)) calc(16px + env(safe-area-inset-bottom))
+                 calc(16px + env(safe-area-inset-right)); align-items:stretch}
+    .card{margin:auto; padding:20px}
+    #altWrap{top:120px}
+  }
   @media (max-width:620px){
-    h1{font-size:30px} .card{padding:18px}
-    .types{grid-template-columns:repeat(2,1fr)} .levels{grid-template-columns:repeat(3,1fr)}
+    h1{font-size:30px} h2{font-size:21px}
+    .card{padding:18px; border-radius:20px}
+    .types{grid-template-columns:repeat(2,1fr)}
+    .levels{grid-template-columns:repeat(3,1fr)}
+    #toast{font-size:20px}
+    .stat{font-size:13px}
+  }
+  @media (max-width:400px){
+    h1{font-size:26px}
+    .levels{grid-template-columns:repeat(2,1fr)}
+    .swatches{gap:8px}
+  }
+  /* very short landscape: the cards must not overflow the viewport */
+  @media (max-height:430px){
+    .card{padding:14px 18px; max-width:560px}
+    h1{font-size:24px; margin-bottom:2px} h2{font-size:19px; margin-bottom:8px}
+    .sub{margin-bottom:10px; font-size:12px}
+    .type svg{height:50px}
+    .row{margin-top:10px}
+    .keys{margin-top:8px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .shake{animation:none}
+    #toast.show{animation-duration:.9s}
   }
 </style>
 </head>
 <body>
 <div id="app">
-  <svg id="stage" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" aria-label="Skyward game">
+  <svg id="stage" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet" aria-label="Skyward game">
     <defs id="defs"></defs>
     <g id="lBg"></g>
     <g id="lParts"></g>
@@ -133,6 +184,7 @@
       <div class="hud-right">
         <div class="chip" style="text-align:right"><small>Score</small><span id="hudScore">0</span></div>
         <div style="display:flex;gap:6px">
+          <button class="btn-icon" id="btnFull" title="Fullscreen" hidden>&#9974;</button>
           <button class="btn-icon" id="btnMute" title="Sound">&#128266;</button>
           <button class="btn-icon" id="btnPause" title="Pause">&#10073;&#10073;</button>
         </div>
@@ -263,7 +315,8 @@
    ========================================================================== */
 'use strict';
 
-const W = 800, H = 600;                  // SVG world units
+const BASE_W = 800, BASE_H = 600;        // the field the levels were tuned against
+let W = BASE_W, H = BASE_H;              // the field actually in play, see Layout
 const NS = 'http://www.w3.org/2000/svg';
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -283,6 +336,65 @@ function gfx(markup, cls) {
   g.innerHTML = markup;
   return g;
 }
+
+/* --------------------------------------------------------------- layout --
+   The play field is reshaped to whatever viewport it lands in.
+
+   A roomy landscape window keeps the tuned 800x600 field. Anything narrower
+   (phones either way up, tablets, a half-width browser window) gets a field
+   whose aspect matches the screen, so the game is full-bleed instead of a
+   letterboxed stamp in the middle of a black page. World width shrinks on
+   small screens so sprites stay a legible size in real pixels.
+
+   Everything downstream reads the scale factors rather than hard numbers:
+     kx  horizontal scale, applied to speeds, wind, drift and barrier gaps
+     ky  vertical scale, applied to fall speeds so transit time is constant
+     k   sprite scale, deliberately blunted so hazards stay readable
+   ------------------------------------------------------------------------ */
+const Layout = {
+  kx: 1, ky: 1, k: 1, framed: true, coarse: false,
+
+  apply() {
+    const app = $('app');
+    const vw = app.clientWidth || innerWidth;
+    const vh = app.clientHeight || innerHeight;
+    this.framed = matchMedia('(min-width:901px) and (min-aspect-ratio:5/4)').matches;
+    this.coarse = matchMedia('(pointer:coarse)').matches;
+
+    if (this.framed) {
+      W = BASE_W; H = BASE_H;
+    } else {
+      const aspect = vw / Math.max(1, vh);
+      /* ~0.78 css px per world unit keeps a balloon thumb-sized on a phone */
+      W = Math.round(clamp(vw / 0.78, 440, BASE_W));
+      /* never so short that hazards arrive unreadably fast, never so tall
+         that the balloon is a speck at the bottom of a chimney */
+      H = Math.round(W / clamp(aspect, 0.48, 1.5));
+    }
+
+    this.kx = W / BASE_W;
+    this.ky = H / BASE_H;
+    this.k = Math.pow(this.kx, 0.45);
+
+    HOME_Y = H * 0.66;
+    Y_MIN = H * 0.2;
+    Y_MAX = H * 0.9;
+
+    $('stage').setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    return this;
+  },
+
+  /* Client coords to world coords. The stage letterboxes inside #app when the
+     aspects do not divide evenly, so the bars have to be taken off first. */
+  toWorld(clientX, clientY) {
+    const r = $('stage').getBoundingClientRect();
+    const s = Math.min(r.width / W, r.height / H);
+    return {
+      x: (clientX - r.left - (r.width - W * s) / 2) / s,
+      y: (clientY - r.top - (r.height - H * s) / 2) / s
+    };
+  }
+};
 
 /* ---------------------------------------------------------------- audio --
    Everything is synthesised, so the page stays a single file.            */
@@ -711,8 +823,9 @@ const SPRITE_LABEL = {
    Skyward - simulation
    ========================================================================== */
 
-const HOME_Y = 400;            // where the balloon rests vertically
-const Y_MIN = 150, Y_MAX = 520;
+/* Set by Layout.apply() for the current viewport */
+let HOME_Y = 400;              // where the balloon rests vertically
+let Y_MIN = 150, Y_MAX = 520;
 
 const Game = {
   level: null, running: false, over: false,
@@ -723,6 +836,7 @@ const Game = {
 
   /* ------------------------------------------------------------- start -- */
   start(level) {
+    Layout.apply();
     this.level = level;
     this.t = 0; this.alt = 0; this.score = 0; this.slip = 0;
     this.over = false; this.running = true; this.invuln = 0; this.wind = 0;
@@ -737,6 +851,7 @@ const Game = {
     this.buildBackground(level.theme);
     this.buildParticles(level.theme);
     this.buildPlayer();
+    this.computeEase();
 
     this.spawners = (level.spawners || []).map(s => ({
       def: s,
@@ -756,6 +871,64 @@ const Game = {
     Sound.windStop();
   },
 
+  /* How crowded this field is compared with the 800x600 one the levels were
+     tuned on. A short landscape phone fits the same hazards into less room,
+     so it gets fewer of them; a tall portrait field is already roomier than
+     baseline and is left alone rather than made denser. */
+  computeEase() {
+    const ty = this.player.ty;
+    const rBase = ty.r * 0.62 + 3;
+    const pressure = (this.player.r * this.player.r) / (W * H) *
+                     (BASE_W * BASE_H) / (rBase * rBase);
+    this.ease = clamp(pressure, 1, 1.35);
+    return this.ease;
+  },
+
+  /* Rotate the phone, resize the window, open the keyboard: the field changes
+     shape under a live game. Rescale everything in place rather than
+     restarting, so a run is never lost to an orientation change. */
+  reflow() {
+    const oldW = W, oldH = H;
+    Layout.apply();
+    if (!this.level) return;
+    const fx = W / oldW, fy = H / oldH;
+
+    $('lBg').innerHTML = '';
+    $('lParts').innerHTML = '';
+    this.bands.length = 0;
+    this.parts.length = 0;
+    this.buildBackground(this.level.theme);
+    this.buildParticles(this.level.theme);
+
+    for (const e of this.ents) {
+      e.x *= fx; e.baseX *= fx; e.y *= fy;
+      e.speed *= fy; e.drift *= fx; e.push *= fx; e.chase *= fx;
+      if (e.sway) e.sway.amp *= fx;
+      if (e.kind === 'barrier') {
+        /* the band spans the field, so it has to be redrawn at the new width */
+        e.gap *= fx; e.gapX *= fx; e.h = 34 * Layout.ky;
+        e.el.innerHTML = SPRITES.barrier.make({ gap: e.gap, gapX: e.gapX, style: e.props.style });
+      } else if (e.kind === 'bolt') {
+        e.width *= fx;
+        e.el.innerHTML = SPRITES.bolt.make({ width: e.width });
+        e.el.setAttribute('transform', 'translate(' + e.x.toFixed(1) + ',0)');
+        if (e.phase === 'strike') {
+          e.el.querySelector('.warn').style.display = 'none';
+          e.el.querySelector('.strike').style.display = '';
+        }
+      }
+    }
+    const p = this.player;
+    p.x = clamp(p.x * fx, p.r, W - p.r);
+    p.y = clamp(p.y * fy, Y_MIN, Y_MAX);
+    p.accel = 1750 * p.ty.accel * Layout.kx;
+    p.top = 380 * p.ty.top * Layout.kx;
+    this.balloonScale = 0.62 * Layout.k;
+    p.r = p.ty.r * this.balloonScale + 3;
+    this.redrawPlayer();
+    this.computeEase();
+  },
+
   /* -------------------------------------------------------- background -- */
   buildBackground(th) {
     const bg = $('lBg'), defs = $('defs');
@@ -767,12 +940,13 @@ const Game = {
     el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#skyGrad)' }, bg);
 
     if (th.sun) {
-      const sx = 640, sy = 120;
+      const sx = W * 0.8, sy = H * 0.2;
       bg.appendChild(gfx('<g><circle cx="' + sx + '" cy="' + sy + '" r="86" fill="#fff6c9" opacity=".28"/>' +
         '<circle cx="' + sx + '" cy="' + sy + '" r="44" fill="#fff3ad" opacity=".85"/></g>'));
     } else if (th.light === 'night') {
-      bg.appendChild(gfx('<g><circle cx="150" cy="110" r="46" fill="#e9f1ff" opacity=".9"/>' +
-        '<circle cx="132" cy="98" r="40" fill="' + th.sky[0] + '" opacity=".9"/></g>'));
+      const mx = W * 0.19, my = H * 0.18;
+      bg.appendChild(gfx('<g><circle cx="' + mx + '" cy="' + my + '" r="46" fill="#e9f1ff" opacity=".9"/>' +
+        '<circle cx="' + (mx - 18) + '" cy="' + (my - 12) + '" r="40" fill="' + th.sky[0] + '" opacity=".9"/></g>'));
     }
 
     /* parallax cloud bands */
@@ -800,7 +974,9 @@ const Game = {
     const kind = th.particles || 'none';
     if (kind === 'none') return;
     const layer = $('lParts');
-    const count = { rain: 90, snow: 70, leaves: 26, pollen: 44, dust: 40, stars: 60 }[kind] || 40;
+    const base = { rain: 90, snow: 70, leaves: 26, pollen: 44, dust: 40, stars: 60 }[kind] || 40;
+    /* keep the density per unit area, not per screen */
+    const count = Math.round(clamp(base * (W * H) / (BASE_W * BASE_H), 12, base * 1.4));
     for (let i = 0; i < count; i++) {
       let m;
       if (kind === 'rain') m = '<path d="M0,0 l-2,14" stroke="#cfe6f7" stroke-width="1.6" opacity=".7"/>';
@@ -814,21 +990,22 @@ const Game = {
       layer.appendChild(e);
       this.parts.push({
         el: e, x: rand(0, W), y: rand(0, H), kind,
-        sp: kind === 'rain' ? rand(430, 620) : kind === 'stars' ? rand(6, 18) : rand(40, 130),
-        dx: rand(-20, 20), ph: rand(0, 6.3)
+        sp: (kind === 'rain' ? rand(430, 620) : kind === 'stars' ? rand(6, 18) : rand(40, 130)) * Layout.ky,
+        dx: rand(-20, 20) * Layout.kx, ph: rand(0, 6.3)
       });
     }
   },
 
   buildPlayer() {
     const ty = typeOf(Save.data.type);
-    const g = gfx(balloonMarkup(ty.id, Save.data.colour, { scale: 0.62 }));
+    this.balloonScale = 0.62 * Layout.k;
+    const g = gfx(balloonMarkup(ty.id, Save.data.colour, { scale: this.balloonScale }));
     $('lPlayer').appendChild(g);
     this.playerEl = g;
     this.player = {
       x: W / 2, y: HOME_Y, vx: 0, vy: 0,
-      r: ty.r * 0.62 + 3, ty,
-      accel: 1750 * ty.accel, drag: ty.drag, top: 380 * ty.top
+      r: ty.r * this.balloonScale + 3, ty,
+      accel: 1750 * ty.accel * Layout.kx, drag: ty.drag, top: 380 * ty.top * Layout.kx
     };
     this.redrawPlayer();
   },
@@ -837,7 +1014,8 @@ const Game = {
   redrawPlayer() {
     const ty = this.player.ty;
     const patched = clamp((this.initialStickers || 0) - this.stickers, 0, 5);
-    this.playerEl.innerHTML = balloonMarkup(ty.id, Save.data.colour, { scale: 0.62, patches: patched });
+    this.playerEl.innerHTML = balloonMarkup(ty.id, Save.data.colour,
+      { scale: this.balloonScale, patches: patched });
   },
 
   /* --------------------------------------------------------------- tick -- */
@@ -852,7 +1030,7 @@ const Game = {
     Sound.windSet(0.15 + Math.abs(this.wind) / 220);
 
     /* ---- input and horizontal movement (the skill) ---- */
-    let ax = Input.x * p.accel + this.wind * 2.2;
+    let ax = Input.x * p.accel + this.wind * 2.2 * Layout.kx;
     p.vx += ax * dt;
     p.vx -= p.vx * p.drag * dt;
     p.vx = clamp(p.vx, -p.top * 1.4, p.top * 1.4);
@@ -861,7 +1039,7 @@ const Game = {
     if (p.x > W - p.r - 6) { p.x = W - p.r - 6; p.vx = -Math.abs(p.vx) * 0.3; }
 
     /* vertical nudge, springs back to the resting line */
-    p.vy += (Input.y * 520 - (p.y - HOME_Y) * 1.9) * dt;
+    p.vy += (Input.y * 520 * Layout.ky - (p.y - HOME_Y) * 1.9) * dt;
     p.vy -= p.vy * 3.4 * dt;
     p.y = clamp(p.y + p.vy * dt, Y_MIN, Y_MAX);
 
@@ -881,10 +1059,10 @@ const Game = {
       sp.next -= dt;
       if (sp.next <= 0) {
         const d = sp.def;
-        sp.next = (d.every || 2) + rand(-(d.jitter || 0), d.jitter || 0);
+        sp.next = ((d.every || 2) + rand(-(d.jitter || 0), d.jitter || 0)) * this.ease;
         if (sp.next < 0.25) sp.next = 0.25;
-        const count = d.count || 1, spread = d.spread || 0;
-        const baseX = rand(70, W - 70);
+        const count = d.count || 1, spread = (d.spread || 0) * Layout.kx;
+        const baseX = rand(W * 0.09, W * 0.91);
         for (let i = 0; i < count; i++) {
           const off = count > 1 ? (i - (count - 1) / 2) * spread : 0;
           this.spawn(d.sprite, d.props || {}, baseX + off);
@@ -899,8 +1077,9 @@ const Game = {
     /* ---- render player ---- */
     const tilt = clamp(p.vx / p.top, -1, 1) * 22;
     const blink = this.invuln > 0 && (Math.sin(this.t * 32) > 0);
+    const knot = 48 * this.balloonScale;   /* the balloon hangs above the knot */
     this.playerEl.setAttribute('transform',
-      'translate(' + p.x.toFixed(1) + ',' + (p.y + 30).toFixed(1) + ') rotate(' + (-tilt).toFixed(1) + ')');
+      'translate(' + p.x.toFixed(1) + ',' + (p.y + knot).toFixed(1) + ') rotate(' + (-tilt).toFixed(1) + ')');
     this.playerEl.setAttribute('opacity', blink ? 0.35 : 1);
 
     UI.syncHud(prog, speedFrac);
@@ -909,10 +1088,10 @@ const Game = {
   },
 
   updateBackground(dt) {
-    const scroll = this.level.scroll;
+    const scroll = this.level.scroll * Layout.ky;
     for (const b of this.bands) {
-      b.y += (b.sp + scroll * 0.28) * dt;
-      b.x += this.wind * 0.35 * dt;
+      b.y += (b.sp * Layout.ky + scroll * 0.28) * dt;
+      b.x += this.wind * Layout.kx * 0.35 * dt;
       if (b.y > H + 120) { b.y = -140; b.x = rand(-60, W + 60); }
       if (b.x < -260) b.x = W + 200; if (b.x > W + 260) b.x = -200;
       b.el.setAttribute('transform', 'translate(' + b.x.toFixed(1) + ',' + b.y.toFixed(1) + ') scale(' + b.sc.toFixed(2) + ')');
@@ -920,14 +1099,15 @@ const Game = {
   },
 
   updateParticles(dt) {
+    const scroll = this.level.scroll * Layout.ky;
     for (const q of this.parts) {
       if (q.kind === 'stars') {
-        q.y += (q.sp + this.level.scroll * 0.08) * dt;
+        q.y += (q.sp + scroll * 0.08) * dt;
       } else {
-        q.y += (q.sp + this.level.scroll * 0.5) * dt;
-        q.x += (q.dx + this.wind * 1.5) * dt;
+        q.y += (q.sp + scroll * 0.5) * dt;
+        q.x += (q.dx + this.wind * Layout.kx * 1.5) * dt;
         if (q.kind === 'leaves' || q.kind === 'pollen')
-          q.x += Math.sin(this.t * 2 + q.ph) * 18 * dt;
+          q.x += Math.sin(this.t * 2 + q.ph) * 18 * Layout.kx * dt;
       }
       if (q.y > H + 20) { q.y = -20; q.x = rand(-40, W + 40); }
       if (q.x < -40) q.x = W + 30; if (q.x > W + 40) q.x = -30;
@@ -938,40 +1118,48 @@ const Game = {
   /* -------------------------------------------------------------- spawn -- */
   spawn(name, props, x) {
     const def = SPRITES[name];
-    if (!def) return;
+    if (!def) { console.warn('unknown sprite "' + name + '" in level ' + this.level.id); return; }
     const p = Object.assign({}, props);
+    const kx = Layout.kx, ky = Layout.ky;
+    const sc = (p.scale || 1) * Layout.k;
     const e = {
-      name, def, kind: def.kind, t: 0,
-      x: x, baseX: x, y: -70, r: (def.r || 0) * (p.scale || 1),
-      speed: p.speed || 0, drift: p.drift || 0,
-      sway: p.sway || null, push: p.push || 0, lift: p.lift || 0,
-      chase: p.chase || 0, damage: p.damage == null ? 1 : p.damage,
-      h: def.h || 0, dead: false, phase: 'live', props: p
+      name, def, kind: def.kind, t: 0, sc,
+      x: x, baseX: x, y: -70 * ky, r: (def.r || 0) * sc,
+      speed: (p.speed || 0) * ky, drift: (p.drift || 0) * kx,
+      sway: p.sway ? { amp: p.sway.amp * kx, freq: p.sway.freq } : null,
+      push: (p.push || 0) * kx, lift: p.lift || 0,
+      chase: (p.chase || 0) * kx, damage: p.damage == null ? 1 : p.damage,
+      h: (def.h || 0) * sc, dead: false, phase: 'live', props: p
     };
 
     if (name === 'barrier') {
-      const gap = p.gap || 180;
+      /* the gap scales with the field, but never below what the balloon can
+         physically fit through with room to aim */
+      const gap = Math.max((p.gap || 180) * kx * this.ease, this.player.r * 5.2);
       e.gap = gap;
-      e.gapX = clamp(rand(gap / 2 + 30, W - gap / 2 - 30), gap / 2 + 20, W - gap / 2 - 20);
+      const edge = gap / 2 + 24 * kx;
+      e.gapX = clamp(rand(edge, W - edge), edge, W - edge);
       /* push the gap away from where the player currently is: that is the test */
-      if (Math.abs(e.gapX - this.player.x) < 190) {
+      if (Math.abs(e.gapX - this.player.x) < W * 0.24) {
         e.gapX = this.player.x < W / 2
-          ? clamp(this.player.x + rand(240, 430), gap / 2 + 24, W - gap / 2 - 24)
-          : clamp(this.player.x - rand(240, 430), gap / 2 + 24, W - gap / 2 - 24);
+          ? clamp(this.player.x + rand(W * 0.3, W * 0.54), edge, W - edge)
+          : clamp(this.player.x - rand(W * 0.3, W * 0.54), edge, W - edge);
       }
       e.x = 0; e.baseX = 0;
-      e.y = -50;
+      e.y = -50 * ky;
+      e.h = 34 * ky;
       e.el = gfx(def.make({ gap: gap, gapX: e.gapX, style: p.style }));
       e.warned = false;
     } else if (name === 'bolt') {
-      e.x = clamp(rand(60, W - 60), 40, W - 40);
+      e.width = (p.width || 30) * kx;
+      e.x = clamp(rand(W * 0.08, W * 0.92), e.width, W - e.width);
       e.baseX = e.x; e.y = 0;
       e.warn = p.warn || 1; e.strike = p.strike || 0.3;
-      e.el = gfx(def.make({ width: p.width || 30 }));
+      e.el = gfx(def.make({ width: e.width }));
       e.el.setAttribute('transform', 'translate(' + e.x.toFixed(1) + ',0)');
       Sound.zap();
     } else if (def.kind === 'zone') {
-      e.h = def.h;
+      e.h = def.h * sc;
       e.dir = Math.random() < 0.5 ? -1 : 1;
       e.el = gfx(def.make({ dir: e.dir }));
       if (name === 'gust') Sound.whoosh();
@@ -988,6 +1176,7 @@ const Game = {
   /* ----------------------------------------------------------- entities -- */
   updateEntities(dt) {
     const L = this.level, p = this.player;
+    const scroll = L.scroll * Layout.ky;
     for (let i = this.ents.length - 1; i >= 0; i--) {
       const e = this.ents[i];
       e.t += dt;
@@ -999,14 +1188,14 @@ const Game = {
       }
 
       /* vertical: world scroll plus the entity's own fall speed */
-      e.y += (L.scroll + e.speed) * dt;
+      e.y += (scroll + e.speed) * dt;
 
       if (e.kind === 'barrier') {
         e.el.setAttribute('transform', 'translate(0,' + e.y.toFixed(1) + ')');
         if (!e.warned && e.y > -20) { e.warned = true; }
         this.hitBarrier(e);
       } else {
-        e.baseX += (e.drift + this.wind * (e.kind === 'soft' ? 1.4 : 0.35)) * dt;
+        e.baseX += (e.drift + this.wind * Layout.kx * (e.kind === 'soft' ? 1.4 : 0.35)) * dt;
         if (e.chase) {
           const dir = Math.sign(p.x - e.baseX);
           e.baseX += dir * e.chase * dt;
@@ -1015,16 +1204,17 @@ const Game = {
         let tr = 'translate(' + e.x.toFixed(1) + ',' + e.y.toFixed(1) + ')';
         if (e.name === 'meteor') {
           /* meteors point along their own travel */
-          tr += ' rotate(' + (Math.atan2(L.scroll + e.speed, e.drift) * 57.3).toFixed(1) + ')';
+          tr += ' rotate(' + (Math.atan2(scroll + e.speed, e.drift) * 57.3).toFixed(1) + ')';
         } else if (e.rot != null && e.def.spin !== false && e.kind !== 'zone' && e.kind !== 'decor') {
           e.rot += e.spin * dt;
           tr += ' rotate(' + e.rot.toFixed(1) + ')';
         }
+        if (e.sc !== 1) tr += ' scale(' + e.sc.toFixed(3) + ')';
         e.el.setAttribute('transform', tr);
         this.hitEntity(e, dt);
       }
 
-      if (e.y > H + 140 || e.dead) {
+      if (e.y > H + 140 * Layout.ky || e.dead) {
         e.el.remove();
         this.ents.splice(i, 1);
         if (!e.dead && e.kind === 'hazard') this.score += 12;   /* dodged */
@@ -1046,7 +1236,7 @@ const Game = {
     } else if (e.phase === 'strike') {
       e.strike -= dt;
       const p = this.player;
-      const w = (e.props.width || 30) / 2 + p.r * 0.55;
+      const w = e.width / 2 + p.r * 0.55;
       if (Math.abs(p.x - e.x) < w) this.hurt('struck by lightning');
       if (e.strike <= 0) e.dead = true;
     }
@@ -1070,7 +1260,7 @@ const Game = {
       if (Math.abs(dy) < e.h / 2 + p.r) {
         if (e.lift) {                       /* updraft: free altitude, gentle lift */
           this.alt += e.lift * dt;
-          p.vy -= 150 * dt;
+          p.vy -= 150 * Layout.ky * dt;
           if (!e.scored) { e.scored = true; UI.toast('updraft'); }
         } else {                            /* gust: shoves you sideways */
           p.vx += e.dir * (e.push || 200) * dt;
@@ -1209,7 +1399,7 @@ const Game = {
    served over http the files are fetched at run time (drop in a new JSON,
    reload, it is in the game). Opened straight from disk, file:// blocks the
    fetch, so the same JSON is also baked in below by tools/build.sh. */
-const EMBEDDED_LEVELS = [{   "id": 1,   "name": "First Light",   "subtitle": "Clear skies, gentle lift",   "hint": "Steer with the arrow keys (or A / D). Moving sideways fast makes you climb faster.",   "targetAltitude": 750,   "climb": 54,   "scroll": 85,   "startStickers": 3,   "wind": { "base": 0, "gust": 0, "period": 10 },   "theme": {     "sky": ["#6ec6f2", "#dff4ff"],     "light": "day",     "sun": true,     "particles": "none",     "cloudBands": 3,     "flash": false   },   "spawners": [     { "sprite": "bird", "every": 2.4, "jitter": 0.9, "props": { "speed": 26, "sway": { "amp": 30, "freq": 0.45 } } },     { "sprite": "cloud", "every": 3.2, "jitter": 1.6, "props": { "speed": -25 } },     { "sprite": "sticker", "every": 12, "jitter": 3 }   ] } ,{   "id": 2,   "name": "Morning Meadow",   "subtitle": "Something is drifting up with you",   "hint": "Hedgerows have exactly one gap. Commit early and cross the whole screen.",   "targetAltitude": 900,   "climb": 54,   "scroll": 95,   "startStickers": 3,   "wind": { "base": 8, "gust": 10, "period": 9 },   "theme": { "sky": ["#63bff0", "#e6f7e9"], "light": "day", "sun": true, "particles": "pollen", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "bird", "every": 2.6, "jitter": 0.8, "props": { "speed": 30, "drift": 26, "sway": { "amp": 24, "freq": 0.5 } } },     { "sprite": "leaf", "every": 1.1, "jitter": 0.5, "count": 2, "spread": 60, "props": { "speed": 18, "push": 55 } },     { "sprite": "barrier", "from": 0.25, "every": 7.5, "jitter": 1.2, "props": { "style": "hedge", "gap": 210 } },     { "sprite": "cloud", "every": 4, "jitter": 1.5, "props": { "speed": -25 } },     { "sprite": "sticker", "every": 11, "jitter": 3 }   ] } ,{   "id": 3,   "name": "Breezy Ridge",   "subtitle": "The air has opinions",   "hint": "Wind pushes constantly. Lean against it before you need to.",   "targetAltitude": 1000,   "climb": 55,   "scroll": 105,   "startStickers": 3,   "wind": { "base": 20, "gust": 70, "period": 7 },   "theme": { "sky": ["#57b6ea", "#dceffb"], "light": "day", "sun": true, "particles": "leaves", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "bird", "every": 2.3, "jitter": 0.7, "props": { "speed": 34, "drift": 40, "sway": { "amp": 26, "freq": 0.6 } } },     { "sprite": "leaf", "every": 0.8, "jitter": 0.4, "count": 3, "spread": 70, "props": { "speed": 22, "push": 70 } },     { "sprite": "twig", "from": 0.2, "every": 3.4, "jitter": 1, "props": { "speed": 55, "drift": 30 } },     { "sprite": "barrier", "from": 0.2, "every": 6.5, "jitter": 1, "props": { "style": "hedge", "gap": 190 } },     { "sprite": "sticker", "every": 11, "jitter": 3 }   ] } ,{   "id": 4,   "name": "Autumn Gale",   "subtitle": "A whole forest went up",   "hint": "Leaves shove you but never pop you. Twigs do. Ride the gust bands.",   "targetAltitude": 1150,   "climb": 56,   "scroll": 115,   "startStickers": 3,   "wind": { "base": -15, "gust": 105, "period": 5.5 },   "theme": { "sky": ["#e6a15c", "#ffe6c4"], "light": "dusk", "sun": true, "particles": "leaves", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "leaf", "every": 0.45, "jitter": 0.2, "count": 3, "spread": 90, "props": { "speed": 30, "push": 90 } },     { "sprite": "twig", "every": 2.1, "jitter": 0.7, "props": { "speed": 70, "drift": 45, "sway": { "amp": 20, "freq": 0.9 } } },     { "sprite": "bird", "every": 3.4, "jitter": 1, "props": { "speed": 40, "drift": 60 } },     { "sprite": "gust", "from": 0.15, "every": 5.5, "jitter": 1.2, "props": { "speed": 10, "push": 260 } },     { "sprite": "barrier", "from": 0.25, "every": 6, "jitter": 0.8, "props": { "style": "hedge", "gap": 180 } },     { "sprite": "sticker", "every": 10, "jitter": 2.5 }   ] } ,{   "id": 5,   "name": "Kite Festival",   "subtitle": "Beautiful. Also: glass-coated string.",   "hint": "Kite lines cut. The gap in a line is narrow, so build speed before you go.",   "targetAltitude": 1250,   "climb": 57,   "scroll": 125,   "startStickers": 3,   "wind": { "base": 25, "gust": 80, "period": 6.5 },   "theme": { "sky": ["#4fb0e8", "#ffeed6"], "light": "day", "sun": true, "particles": "pollen", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "kite", "every": 2.2, "jitter": 0.6, "props": { "speed": 45, "drift": 35, "sway": { "amp": 40, "freq": 0.7 } } },     { "sprite": "barrier", "from": 0.12, "every": 5.2, "jitter": 0.8, "props": { "style": "string", "gap": 165 } },     { "sprite": "bird", "every": 3, "jitter": 0.9, "props": { "speed": 44, "drift": -50 } },     { "sprite": "leaf", "every": 1.4, "jitter": 0.6, "count": 2, "spread": 70, "props": { "speed": 26, "push": 70 } },     { "sprite": "sticker", "every": 10, "jitter": 2.5 }   ] } ,{   "id": 6,   "name": "Thunderhead",   "subtitle": "The light goes green and the air goes still",   "hint": "A white column means a bolt is coming. Be anywhere else.",   "targetAltitude": 1350,   "climb": 57,   "scroll": 130,   "startStickers": 3,   "wind": { "base": -20, "gust": 90, "period": 6 },   "theme": { "sky": ["#4a5a72", "#93a8bd"], "light": "storm", "sun": false, "particles": "rain", "cloudBands": 5, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.7, "jitter": 0.3, "count": 2, "spread": 80, "props": { "speed": 105 } },     { "sprite": "bolt", "from": 0.15, "every": 5.5, "jitter": 1.4, "props": { "warn": 1.05, "strike": 0.3, "width": 30 } },     { "sprite": "gust", "every": 6, "jitter": 1.5, "props": { "speed": 15, "push": 240 } },     { "sprite": "barrier", "from": 0.3, "every": 6.5, "jitter": 1, "props": { "style": "hail", "gap": 175 } },     { "sprite": "sticker", "every": 9.5, "jitter": 2.5 }   ] } ,{   "id": 7,   "name": "Storm Front",   "subtitle": "Two bolts, and less warning",   "hint": "Bolts come in pairs now. Read both columns, then pick your lane.",   "targetAltitude": 1500,   "climb": 58,   "scroll": 145,   "startStickers": 3,   "wind": { "base": 0, "gust": 135, "period": 4.5 },   "theme": { "sky": ["#2f3b52", "#6d7f97"], "light": "storm", "sun": false, "particles": "rain", "cloudBands": 5, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.5, "jitter": 0.2, "count": 2, "spread": 90, "props": { "speed": 125 } },     { "sprite": "bolt", "every": 3.6, "jitter": 0.8, "count": 2, "spread": 260, "props": { "warn": 0.9, "strike": 0.3, "width": 30 } },     { "sprite": "gust", "every": 4.5, "jitter": 1, "props": { "speed": 20, "push": 300 } },     { "sprite": "barrier", "from": 0.15, "every": 5.5, "jitter": 0.8, "props": { "style": "hail", "gap": 165 } },     { "sprite": "sticker", "every": 9, "jitter": 2 }   ] } ,{   "id": 8,   "name": "Hail Alley",   "subtitle": "Ice with corners",   "hint": "Icicles fall fast and straight. Keep moving, because a still balloon is a target.",   "targetAltitude": 1600,   "climb": 58,   "scroll": 155,   "startStickers": 3,   "wind": { "base": 30, "gust": 90, "period": 5 },   "theme": { "sky": ["#41566e", "#b9d6e8"], "light": "storm", "sun": false, "particles": "snow", "cloudBands": 4, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.34, "jitter": 0.15, "count": 3, "spread": 110, "props": { "speed": 130 } },     { "sprite": "icicle", "from": 0.1, "every": 1.5, "jitter": 0.5, "props": { "speed": 210 } },     { "sprite": "barrier", "from": 0.15, "every": 5, "jitter": 0.7, "props": { "style": "ice", "gap": 155 } },     { "sprite": "bolt", "from": 0.5, "every": 7, "jitter": 2, "props": { "warn": 0.85, "strike": 0.28, "width": 32 } },     { "sprite": "sticker", "every": 9, "jitter": 2 }   ] } ,{   "id": 9,   "name": "Thorn Updraft",   "subtitle": "Seeds that travel by puncture",   "hint": "Green updraft columns give you altitude for free. Burrs spiral, so do not chase them.",   "targetAltitude": 1750,   "climb": 56,   "scroll": 160,   "startStickers": 3,   "wind": { "base": -25, "gust": 110, "period": 4 },   "theme": { "sky": ["#5c8f6a", "#dff0d8"], "light": "day", "sun": true, "particles": "dust", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "burr", "every": 0.85, "jitter": 0.3, "count": 2, "spread": 120, "props": { "speed": 60, "sway": { "amp": 95, "freq": 0.85 } } },     { "sprite": "twig", "every": 2, "jitter": 0.6, "props": { "speed": 90, "drift": 55 } },     { "sprite": "updraft", "every": 6, "jitter": 1.5, "props": { "speed": -30, "lift": 55 } },     { "sprite": "barrier", "from": 0.12, "every": 4.8, "jitter": 0.7, "props": { "style": "thorn", "gap": 150 } },     { "sprite": "sticker", "every": 8.5, "jitter": 2 }   ] } ,{   "id": 10,   "name": "Drone Corridor",   "subtitle": "Restricted airspace, apparently",   "hint": "Drones track your side of the screen. Fake one way, then go the other.",   "targetAltitude": 1900,   "climb": 58,   "scroll": 170,   "startStickers": 3,   "wind": { "base": 15, "gust": 70, "period": 5 },   "theme": { "sky": ["#3d4a63", "#9fb6c9"], "light": "dusk", "sun": false, "particles": "dust", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "drone", "every": 1.7, "jitter": 0.5, "props": { "speed": 70, "chase": 55 } },     { "sprite": "spark", "every": 0.7, "jitter": 0.3, "count": 2, "spread": 100, "props": { "speed": 145 } },     { "sprite": "barrier", "from": 0.1, "every": 4.4, "jitter": 0.6, "props": { "style": "laser", "gap": 150 } },     { "sprite": "bolt", "from": 0.45, "every": 6.5, "jitter": 1.5, "props": { "warn": 0.8, "strike": 0.28, "width": 34 } },     { "sprite": "sticker", "every": 8.5, "jitter": 2 }   ] } ,{   "id": 11,   "name": "Meteor Shower",   "subtitle": "Make a wish, then move",   "hint": "Meteors arrive fast and diagonal. Watch the angle, not the rock.",   "targetAltitude": 2050,   "climb": 59,   "scroll": 180,   "startStickers": 3,   "wind": { "base": -35, "gust": 120, "period": 4 },   "theme": { "sky": ["#141c33", "#3a4a72"], "light": "night", "sun": false, "particles": "stars", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "meteor", "every": 0.85, "jitter": 0.3, "props": { "speed": 230, "drift": 150 } },     { "sprite": "meteor", "every": 1.1, "jitter": 0.4, "props": { "speed": 230, "drift": -150 } },     { "sprite": "hail", "every": 0.6, "jitter": 0.25, "count": 2, "spread": 110, "props": { "speed": 120 } },     { "sprite": "barrier", "from": 0.15, "every": 5, "jitter": 0.7, "props": { "style": "ice", "gap": 150 } },     { "sprite": "updraft", "every": 8, "jitter": 2, "props": { "speed": -30, "lift": 50 } },     { "sprite": "sticker", "every": 8, "jitter": 2 }   ] } ,{   "id": 12,   "name": "Edge of Space",   "subtitle": "Thin air, sharp everything",   "hint": "Everything at once. The only rule left is: never stop moving sideways.",   "targetAltitude": 2300,   "climb": 60,   "scroll": 195,   "startStickers": 3,   "wind": { "base": 0, "gust": 175, "period": 3.2 },   "theme": { "sky": ["#0a1030", "#2b1b4d"], "light": "night", "sun": false, "particles": "stars", "cloudBands": 2, "flash": true },   "spawners": [     { "sprite": "shard", "every": 0.5, "jitter": 0.2, "count": 2, "spread": 120, "props": { "speed": 150, "sway": { "amp": 55, "freq": 1.1 } } },     { "sprite": "meteor", "every": 1.3, "jitter": 0.4, "props": { "speed": 250, "drift": 170 } },     { "sprite": "orb", "every": 2.4, "jitter": 0.6, "props": { "speed": 60, "chase": 70 } },     { "sprite": "bolt", "every": 3.4, "jitter": 0.7, "count": 2, "spread": 240, "props": { "warn": 0.75, "strike": 0.3, "width": 34 } },     { "sprite": "barrier", "every": 4.2, "jitter": 0.5, "props": { "style": "laser", "gap": 145 } },     { "sprite": "updraft", "every": 7, "jitter": 1.5, "props": { "speed": -30, "lift": 55 } },     { "sprite": "sticker", "every": 7.5, "jitter": 1.5 }   ] } ] ;
+const EMBEDDED_LEVELS = [{   "id": 1,   "name": "First Light",   "subtitle": "Clear skies, gentle lift",   "hint": "Steer with the arrow keys (or A / D). Moving sideways fast makes you climb faster.",   "targetAltitude": 750,   "climb": 54,   "scroll": 85,   "startStickers": 3,   "wind": { "base": 0, "gust": 0, "period": 10 },   "theme": {     "sky": ["#6ec6f2", "#dff4ff"],     "light": "day",     "sun": true,     "particles": "none",     "cloudBands": 3,     "flash": false   },   "spawners": [     { "sprite": "bird", "every": 2.4, "jitter": 0.9, "props": { "speed": 26, "sway": { "amp": 30, "freq": 0.45 } } },     { "sprite": "cloud", "every": 3.2, "jitter": 1.6, "props": { "speed": -25 } },     { "sprite": "sticker", "every": 12, "jitter": 3 }   ] } ,{   "id": 2,   "name": "Morning Meadow",   "subtitle": "Something is drifting up with you",   "hint": "Hedgerows have exactly one gap. Commit early and cross the whole screen.",   "targetAltitude": 900,   "climb": 54,   "scroll": 95,   "startStickers": 3,   "wind": { "base": 8, "gust": 10, "period": 9 },   "theme": { "sky": ["#63bff0", "#e6f7e9"], "light": "day", "sun": true, "particles": "pollen", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "bird", "every": 2.6, "jitter": 0.8, "props": { "speed": 30, "drift": 26, "sway": { "amp": 24, "freq": 0.5 } } },     { "sprite": "leaf", "every": 1.1, "jitter": 0.5, "count": 2, "spread": 60, "props": { "speed": 18, "push": 55 } },     { "sprite": "barrier", "from": 0.25, "every": 7.5, "jitter": 1.2, "props": { "style": "hedge", "gap": 210 } },     { "sprite": "cloud", "every": 4, "jitter": 1.5, "props": { "speed": -25 } },     { "sprite": "sticker", "every": 11, "jitter": 3 }   ] } ,{   "id": 3,   "name": "Breezy Ridge",   "subtitle": "The air has opinions",   "hint": "Wind pushes constantly. Lean against it before you need to.",   "targetAltitude": 1000,   "climb": 55,   "scroll": 105,   "startStickers": 3,   "wind": { "base": 20, "gust": 70, "period": 7 },   "theme": { "sky": ["#57b6ea", "#dceffb"], "light": "day", "sun": true, "particles": "leaves", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "bird", "every": 2.3, "jitter": 0.7, "props": { "speed": 34, "drift": 40, "sway": { "amp": 26, "freq": 0.6 } } },     { "sprite": "leaf", "every": 0.8, "jitter": 0.4, "count": 3, "spread": 70, "props": { "speed": 22, "push": 70 } },     { "sprite": "twig", "from": 0.2, "every": 3.4, "jitter": 1, "props": { "speed": 55, "drift": 30 } },     { "sprite": "barrier", "from": 0.2, "every": 6.5, "jitter": 1, "props": { "style": "hedge", "gap": 190 } },     { "sprite": "sticker", "every": 11, "jitter": 3 }   ] } ,{   "id": 4,   "name": "Autumn Gale",   "subtitle": "A whole forest went up",   "hint": "Leaves shove you but never pop you. Twigs do. Ride the gust bands.",   "targetAltitude": 1150,   "climb": 56,   "scroll": 115,   "startStickers": 3,   "wind": { "base": -15, "gust": 105, "period": 5.5 },   "theme": { "sky": ["#e6a15c", "#ffe6c4"], "light": "dusk", "sun": true, "particles": "leaves", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "leaf", "every": 0.45, "jitter": 0.2, "count": 3, "spread": 90, "props": { "speed": 30, "push": 90 } },     { "sprite": "twig", "every": 2.1, "jitter": 0.7, "props": { "speed": 70, "drift": 45, "sway": { "amp": 20, "freq": 0.9 } } },     { "sprite": "bird", "every": 3.4, "jitter": 1, "props": { "speed": 40, "drift": 60 } },     { "sprite": "gust", "from": 0.15, "every": 5.5, "jitter": 1.2, "props": { "speed": 10, "push": 260 } },     { "sprite": "barrier", "from": 0.25, "every": 6, "jitter": 0.8, "props": { "style": "hedge", "gap": 180 } },     { "sprite": "sticker", "every": 10, "jitter": 2.5 }   ] } ,{   "id": 5,   "name": "Kite Festival",   "subtitle": "Beautiful. Also: glass-coated string.",   "hint": "Kite lines cut. The gap in a line is narrow, so build speed before you go.",   "targetAltitude": 1250,   "climb": 57,   "scroll": 125,   "startStickers": 3,   "wind": { "base": 25, "gust": 80, "period": 6.5 },   "theme": { "sky": ["#4fb0e8", "#ffeed6"], "light": "day", "sun": true, "particles": "pollen", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "kite", "every": 2.2, "jitter": 0.6, "props": { "speed": 45, "drift": 35, "sway": { "amp": 40, "freq": 0.7 } } },     { "sprite": "barrier", "from": 0.12, "every": 5.2, "jitter": 0.8, "props": { "style": "string", "gap": 165 } },     { "sprite": "bird", "every": 3, "jitter": 0.9, "props": { "speed": 44, "drift": -50 } },     { "sprite": "leaf", "every": 1.4, "jitter": 0.6, "count": 2, "spread": 70, "props": { "speed": 26, "push": 70 } },     { "sprite": "sticker", "every": 10, "jitter": 2.5 }   ] } ,{   "id": 6,   "name": "Thunderhead",   "subtitle": "The light goes green and the air goes still",   "hint": "A white column means a bolt is coming. Be anywhere else.",   "targetAltitude": 1350,   "climb": 57,   "scroll": 130,   "startStickers": 3,   "wind": { "base": -20, "gust": 90, "period": 6 },   "theme": { "sky": ["#4a5a72", "#93a8bd"], "light": "storm", "sun": false, "particles": "rain", "cloudBands": 5, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.7, "jitter": 0.3, "count": 2, "spread": 80, "props": { "speed": 105 } },     { "sprite": "bolt", "from": 0.15, "every": 5.5, "jitter": 1.4, "props": { "warn": 1.05, "strike": 0.3, "width": 30 } },     { "sprite": "gust", "every": 6, "jitter": 1.5, "props": { "speed": 15, "push": 240 } },     { "sprite": "barrier", "from": 0.3, "every": 6.5, "jitter": 1, "props": { "style": "hail", "gap": 175 } },     { "sprite": "sticker", "every": 9.5, "jitter": 2.5 }   ] } ,{   "id": 7,   "name": "Storm Front",   "subtitle": "Two bolts, and less warning",   "hint": "Bolts come in pairs now. Read both columns, then pick your lane.",   "targetAltitude": 1500,   "climb": 58,   "scroll": 145,   "startStickers": 3,   "wind": { "base": 0, "gust": 135, "period": 4.5 },   "theme": { "sky": ["#2f3b52", "#6d7f97"], "light": "storm", "sun": false, "particles": "rain", "cloudBands": 5, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.78, "jitter": 0.25, "count": 2, "spread": 90, "props": { "speed": 125 } },     { "sprite": "bolt", "every": 3.6, "jitter": 0.8, "count": 2, "spread": 260, "props": { "warn": 0.9, "strike": 0.3, "width": 30 } },     { "sprite": "gust", "every": 4.5, "jitter": 1, "props": { "speed": 20, "push": 300 } },     { "sprite": "barrier", "from": 0.15, "every": 5.5, "jitter": 0.8, "props": { "style": "hail", "gap": 165 } },     { "sprite": "sticker", "every": 9, "jitter": 2 }   ] } ,{   "id": 8,   "name": "Hail Alley",   "subtitle": "Ice with corners",   "hint": "Icicles fall fast and straight. Keep moving, because a still balloon is a target.",   "targetAltitude": 1600,   "climb": 58,   "scroll": 155,   "startStickers": 3,   "wind": { "base": 30, "gust": 90, "period": 5 },   "theme": { "sky": ["#41566e", "#b9d6e8"], "light": "storm", "sun": false, "particles": "snow", "cloudBands": 4, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.62, "jitter": 0.2, "count": 2, "spread": 110, "props": { "speed": 130 } },     { "sprite": "icicle", "from": 0.1, "every": 1.9, "jitter": 0.5, "props": { "speed": 210 } },     { "sprite": "barrier", "from": 0.15, "every": 5, "jitter": 0.7, "props": { "style": "ice", "gap": 155 } },     { "sprite": "bolt", "from": 0.5, "every": 7, "jitter": 2, "props": { "warn": 0.85, "strike": 0.28, "width": 32 } },     { "sprite": "sticker", "every": 9, "jitter": 2 }   ] } ,{   "id": 9,   "name": "Thorn Updraft",   "subtitle": "Seeds that travel by puncture",   "hint": "Green updraft columns give you altitude for free. Burrs spiral, so do not chase them.",   "targetAltitude": 1750,   "climb": 56,   "scroll": 160,   "startStickers": 3,   "wind": { "base": -25, "gust": 110, "period": 4 },   "theme": { "sky": ["#5c8f6a", "#dff0d8"], "light": "day", "sun": true, "particles": "dust", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "burr", "every": 1.25, "jitter": 0.35, "count": 2, "spread": 120, "props": { "speed": 60, "sway": { "amp": 70, "freq": 0.7 } } },     { "sprite": "twig", "every": 2, "jitter": 0.6, "props": { "speed": 90, "drift": 55 } },     { "sprite": "updraft", "every": 6, "jitter": 1.5, "props": { "speed": -30, "lift": 55 } },     { "sprite": "barrier", "from": 0.12, "every": 4.8, "jitter": 0.7, "props": { "style": "thorn", "gap": 150 } },     { "sprite": "sticker", "every": 8.5, "jitter": 2 }   ] } ,{   "id": 10,   "name": "Drone Corridor",   "subtitle": "Restricted airspace, apparently",   "hint": "Drones track your side of the screen. Fake one way, then go the other.",   "targetAltitude": 1900,   "climb": 58,   "scroll": 170,   "startStickers": 3,   "wind": { "base": 15, "gust": 70, "period": 5 },   "theme": { "sky": ["#3d4a63", "#9fb6c9"], "light": "dusk", "sun": false, "particles": "dust", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "drone", "every": 2.1, "jitter": 0.5, "props": { "speed": 70, "chase": 45 } },     { "sprite": "spark", "every": 1.05, "jitter": 0.35, "count": 2, "spread": 100, "props": { "speed": 145 } },     { "sprite": "barrier", "from": 0.1, "every": 4.4, "jitter": 0.6, "props": { "style": "laser", "gap": 150 } },     { "sprite": "bolt", "from": 0.45, "every": 6.5, "jitter": 1.5, "props": { "warn": 0.8, "strike": 0.28, "width": 34 } },     { "sprite": "sticker", "every": 8.5, "jitter": 2 }   ] } ,{   "id": 11,   "name": "Meteor Shower",   "subtitle": "Make a wish, then move",   "hint": "Meteors arrive fast and diagonal. Watch the angle, not the rock.",   "targetAltitude": 2050,   "climb": 59,   "scroll": 180,   "startStickers": 4,   "wind": { "base": -35, "gust": 120, "period": 4 },   "theme": { "sky": ["#141c33", "#3a4a72"], "light": "night", "sun": false, "particles": "stars", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "meteor", "every": 1.5, "jitter": 0.4, "props": { "speed": 230, "drift": 150 } },     { "sprite": "meteor", "every": 1.5, "jitter": 0.4, "props": { "speed": 230, "drift": -150 } },     { "sprite": "hail", "every": 1.3, "jitter": 0.35, "count": 2, "spread": 110, "props": { "speed": 120 } },     { "sprite": "barrier", "from": 0.15, "every": 5, "jitter": 0.7, "props": { "style": "ice", "gap": 150 } },     { "sprite": "updraft", "every": 8, "jitter": 2, "props": { "speed": -30, "lift": 50 } },     { "sprite": "sticker", "every": 8, "jitter": 2 }   ] } ,{   "id": 12,   "name": "Edge of Space",   "subtitle": "Thin air, sharp everything",   "hint": "Everything at once. The only rule left is: never stop moving sideways.",   "targetAltitude": 2300,   "climb": 60,   "scroll": 195,   "startStickers": 4,   "wind": { "base": 0, "gust": 175, "period": 3.2 },   "theme": { "sky": ["#0a1030", "#2b1b4d"], "light": "night", "sun": false, "particles": "stars", "cloudBands": 2, "flash": true },   "spawners": [     { "sprite": "shard", "every": 1.15, "jitter": 0.3, "count": 2, "spread": 120, "props": { "speed": 150, "sway": { "amp": 45, "freq": 0.9 } } },     { "sprite": "meteor", "every": 1.7, "jitter": 0.45, "props": { "speed": 250, "drift": 170 } },     { "sprite": "orb", "every": 3.6, "jitter": 0.7, "props": { "speed": 60, "chase": 52 } },     { "sprite": "bolt", "every": 4.8, "jitter": 0.9, "count": 2, "spread": 240, "props": { "warn": 0.75, "strike": 0.3, "width": 34 } },     { "sprite": "barrier", "every": 4.8, "jitter": 0.6, "props": { "style": "laser", "gap": 145 } },     { "sprite": "updraft", "every": 7, "jitter": 1.5, "props": { "speed": -30, "lift": 55 } },     { "sprite": "sticker", "every": 7.5, "jitter": 1.5 }   ] } ] ;
 
 let LEVELS = EMBEDDED_LEVELS.slice();
 
@@ -1242,16 +1432,18 @@ const Input = {
     addEventListener('blur', () => { this.keys = {}; });
 
     const stage = $('app');
-    const toWorld = ev => {
-      const r = stage.getBoundingClientRect();
-      return ((ev.clientX - r.left) / r.width) * W;
-    };
     stage.addEventListener('pointerdown', ev => {
       if (ev.target.closest('.screen') || ev.target.closest('.btn-icon')) return;
-      this.pointer = toWorld(ev); stage.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      this.pointer = Layout.toWorld(ev.clientX, ev.clientY).x;
+      try { stage.setPointerCapture(ev.pointerId); } catch (e) {}
     });
-    stage.addEventListener('pointermove', ev => { if (this.pointer != null) this.pointer = toWorld(ev); });
-    ['pointerup', 'pointercancel'].forEach(t => stage.addEventListener(t, () => { this.pointer = null; }));
+    stage.addEventListener('pointermove', ev => {
+      if (this.pointer != null) this.pointer = Layout.toWorld(ev.clientX, ev.clientY).x;
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t =>
+      stage.addEventListener(t, () => { this.pointer = null; }));
+    stage.addEventListener('contextmenu', ev => ev.preventDefault());
   },
   read() {
     let x = 0, y = 0;
@@ -1260,8 +1452,10 @@ const Input = {
     if (this.keys['arrowup'] || this.keys['w']) y -= 1;
     if (this.keys['arrowdown'] || this.keys['s']) y += 1;
     if (this.pointer != null && Game.player) {
+      /* steer toward the finger: it can sit low on the screen, out of the way
+         of the balloon, and still aim it */
       const d = this.pointer - Game.player.x;
-      x = clamp(d / 90, -1, 1);
+      x = clamp(d / (90 * Layout.kx), -1, 1);
     }
     this.x = x; this.y = y;
   }
@@ -1350,6 +1544,10 @@ const UI = {
     this.hide();
     Game.start(LEVELS[i]);
     this.buildStickerPips();
+    if (Layout.coarse && !this.taughtTouch) {
+      this.taughtTouch = true;
+      this.toast('drag anywhere to steer');
+    }
   },
 
   buildStickerPips() {
@@ -1391,6 +1589,18 @@ const UI = {
   toggleMute() {
     const on = Sound.toggle();
     $('btnMute').innerHTML = on ? '&#128266;' : '&#128263;';
+  },
+
+  toggleFullscreen() {
+    const app = $('app');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (app.requestFullscreen) app.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  },
+
+  /* Losing focus on a phone means a call, a notification, or a swipe away.
+     Freeze rather than let hail land on an unattended balloon. */
+  autoPause() {
+    if (Game.running && !Game.over) this.togglePause();
   },
 
   win(bonus, stickBonus) {
@@ -1446,6 +1656,23 @@ const UI = {
     go('btnLoseLevels', () => this.quit());
     $('btnPause').onclick = () => this.togglePause();
     $('btnMute').onclick = () => { Sound.init(); this.toggleMute(); };
+
+    const full = $('btnFull');
+    if ($('app').requestFullscreen) {
+      full.hidden = false;
+      full.onclick = () => this.toggleFullscreen();
+    }
+
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.autoPause(); });
+    addEventListener('blur', () => this.autoPause());
+
+    let rt = 0;
+    const onResize = () => {
+      clearTimeout(rt);
+      rt = setTimeout(() => { Game.reflow(); if (Game.level) this.buildStickerPips(); }, 140);
+    };
+    addEventListener('resize', onResize);
+    addEventListener('orientationchange', onResize);
   }
 };
 
@@ -1461,6 +1688,7 @@ function frame(ts) {
 
 (async function boot() {
   Save.load();
+  Layout.apply();
   ensureBalloonGradients();
   await loadLevels();
   Input.init();

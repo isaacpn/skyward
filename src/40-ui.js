@@ -39,16 +39,18 @@ const Input = {
     addEventListener('blur', () => { this.keys = {}; });
 
     const stage = $('app');
-    const toWorld = ev => {
-      const r = stage.getBoundingClientRect();
-      return ((ev.clientX - r.left) / r.width) * W;
-    };
     stage.addEventListener('pointerdown', ev => {
       if (ev.target.closest('.screen') || ev.target.closest('.btn-icon')) return;
-      this.pointer = toWorld(ev); stage.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      this.pointer = Layout.toWorld(ev.clientX, ev.clientY).x;
+      try { stage.setPointerCapture(ev.pointerId); } catch (e) {}
     });
-    stage.addEventListener('pointermove', ev => { if (this.pointer != null) this.pointer = toWorld(ev); });
-    ['pointerup', 'pointercancel'].forEach(t => stage.addEventListener(t, () => { this.pointer = null; }));
+    stage.addEventListener('pointermove', ev => {
+      if (this.pointer != null) this.pointer = Layout.toWorld(ev.clientX, ev.clientY).x;
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t =>
+      stage.addEventListener(t, () => { this.pointer = null; }));
+    stage.addEventListener('contextmenu', ev => ev.preventDefault());
   },
   read() {
     let x = 0, y = 0;
@@ -57,8 +59,10 @@ const Input = {
     if (this.keys['arrowup'] || this.keys['w']) y -= 1;
     if (this.keys['arrowdown'] || this.keys['s']) y += 1;
     if (this.pointer != null && Game.player) {
+      /* steer toward the finger: it can sit low on the screen, out of the way
+         of the balloon, and still aim it */
       const d = this.pointer - Game.player.x;
-      x = clamp(d / 90, -1, 1);
+      x = clamp(d / (90 * Layout.kx), -1, 1);
     }
     this.x = x; this.y = y;
   }
@@ -147,6 +151,10 @@ const UI = {
     this.hide();
     Game.start(LEVELS[i]);
     this.buildStickerPips();
+    if (Layout.coarse && !this.taughtTouch) {
+      this.taughtTouch = true;
+      this.toast('drag anywhere to steer');
+    }
   },
 
   buildStickerPips() {
@@ -188,6 +196,18 @@ const UI = {
   toggleMute() {
     const on = Sound.toggle();
     $('btnMute').innerHTML = on ? '&#128266;' : '&#128263;';
+  },
+
+  toggleFullscreen() {
+    const app = $('app');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (app.requestFullscreen) app.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  },
+
+  /* Losing focus on a phone means a call, a notification, or a swipe away.
+     Freeze rather than let hail land on an unattended balloon. */
+  autoPause() {
+    if (Game.running && !Game.over) this.togglePause();
   },
 
   win(bonus, stickBonus) {
@@ -243,6 +263,23 @@ const UI = {
     go('btnLoseLevels', () => this.quit());
     $('btnPause').onclick = () => this.togglePause();
     $('btnMute').onclick = () => { Sound.init(); this.toggleMute(); };
+
+    const full = $('btnFull');
+    if ($('app').requestFullscreen) {
+      full.hidden = false;
+      full.onclick = () => this.toggleFullscreen();
+    }
+
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.autoPause(); });
+    addEventListener('blur', () => this.autoPause());
+
+    let rt = 0;
+    const onResize = () => {
+      clearTimeout(rt);
+      rt = setTimeout(() => { Game.reflow(); if (Game.level) this.buildStickerPips(); }, 140);
+    };
+    addEventListener('resize', onResize);
+    addEventListener('orientationchange', onResize);
   }
 };
 
@@ -258,6 +295,7 @@ function frame(ts) {
 
 (async function boot() {
   Save.load();
+  Layout.apply();
   ensureBalloonGradients();
   await loadLevels();
   Input.init();

@@ -3,7 +3,8 @@
    ========================================================================== */
 'use strict';
 
-const W = 800, H = 600;                  // SVG world units
+const BASE_W = 800, BASE_H = 600;        // the field the levels were tuned against
+let W = BASE_W, H = BASE_H;              // the field actually in play, see Layout
 const NS = 'http://www.w3.org/2000/svg';
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -23,6 +24,65 @@ function gfx(markup, cls) {
   g.innerHTML = markup;
   return g;
 }
+
+/* --------------------------------------------------------------- layout --
+   The play field is reshaped to whatever viewport it lands in.
+
+   A roomy landscape window keeps the tuned 800x600 field. Anything narrower
+   (phones either way up, tablets, a half-width browser window) gets a field
+   whose aspect matches the screen, so the game is full-bleed instead of a
+   letterboxed stamp in the middle of a black page. World width shrinks on
+   small screens so sprites stay a legible size in real pixels.
+
+   Everything downstream reads the scale factors rather than hard numbers:
+     kx  horizontal scale, applied to speeds, wind, drift and barrier gaps
+     ky  vertical scale, applied to fall speeds so transit time is constant
+     k   sprite scale, deliberately blunted so hazards stay readable
+   ------------------------------------------------------------------------ */
+const Layout = {
+  kx: 1, ky: 1, k: 1, framed: true, coarse: false,
+
+  apply() {
+    const app = $('app');
+    const vw = app.clientWidth || innerWidth;
+    const vh = app.clientHeight || innerHeight;
+    this.framed = matchMedia('(min-width:901px) and (min-aspect-ratio:5/4)').matches;
+    this.coarse = matchMedia('(pointer:coarse)').matches;
+
+    if (this.framed) {
+      W = BASE_W; H = BASE_H;
+    } else {
+      const aspect = vw / Math.max(1, vh);
+      /* ~0.78 css px per world unit keeps a balloon thumb-sized on a phone */
+      W = Math.round(clamp(vw / 0.78, 440, BASE_W));
+      /* never so short that hazards arrive unreadably fast, never so tall
+         that the balloon is a speck at the bottom of a chimney */
+      H = Math.round(W / clamp(aspect, 0.48, 1.5));
+    }
+
+    this.kx = W / BASE_W;
+    this.ky = H / BASE_H;
+    this.k = Math.pow(this.kx, 0.45);
+
+    HOME_Y = H * 0.66;
+    Y_MIN = H * 0.2;
+    Y_MAX = H * 0.9;
+
+    $('stage').setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    return this;
+  },
+
+  /* Client coords to world coords. The stage letterboxes inside #app when the
+     aspects do not divide evenly, so the bars have to be taken off first. */
+  toWorld(clientX, clientY) {
+    const r = $('stage').getBoundingClientRect();
+    const s = Math.min(r.width / W, r.height / H);
+    return {
+      x: (clientX - r.left - (r.width - W * s) / 2) / s,
+      y: (clientY - r.top - (r.height - H * s) / 2) / s
+    };
+  }
+};
 
 /* ---------------------------------------------------------------- audio --
    Everything is synthesised, so the page stays a single file.            */

@@ -2,8 +2,9 @@
    Skyward - simulation
    ========================================================================== */
 
-const HOME_Y = 400;            // where the balloon rests vertically
-const Y_MIN = 150, Y_MAX = 520;
+/* Set by Layout.apply() for the current viewport */
+let HOME_Y = 400;              // where the balloon rests vertically
+let Y_MIN = 150, Y_MAX = 520;
 
 const Game = {
   level: null, running: false, over: false,
@@ -14,6 +15,7 @@ const Game = {
 
   /* ------------------------------------------------------------- start -- */
   start(level) {
+    Layout.apply();
     this.level = level;
     this.t = 0; this.alt = 0; this.score = 0; this.slip = 0;
     this.over = false; this.running = true; this.invuln = 0; this.wind = 0;
@@ -28,6 +30,7 @@ const Game = {
     this.buildBackground(level.theme);
     this.buildParticles(level.theme);
     this.buildPlayer();
+    this.computeEase();
 
     this.spawners = (level.spawners || []).map(s => ({
       def: s,
@@ -47,6 +50,64 @@ const Game = {
     Sound.windStop();
   },
 
+  /* How crowded this field is compared with the 800x600 one the levels were
+     tuned on. A short landscape phone fits the same hazards into less room,
+     so it gets fewer of them; a tall portrait field is already roomier than
+     baseline and is left alone rather than made denser. */
+  computeEase() {
+    const ty = this.player.ty;
+    const rBase = ty.r * 0.62 + 3;
+    const pressure = (this.player.r * this.player.r) / (W * H) *
+                     (BASE_W * BASE_H) / (rBase * rBase);
+    this.ease = clamp(pressure, 1, 1.35);
+    return this.ease;
+  },
+
+  /* Rotate the phone, resize the window, open the keyboard: the field changes
+     shape under a live game. Rescale everything in place rather than
+     restarting, so a run is never lost to an orientation change. */
+  reflow() {
+    const oldW = W, oldH = H;
+    Layout.apply();
+    if (!this.level) return;
+    const fx = W / oldW, fy = H / oldH;
+
+    $('lBg').innerHTML = '';
+    $('lParts').innerHTML = '';
+    this.bands.length = 0;
+    this.parts.length = 0;
+    this.buildBackground(this.level.theme);
+    this.buildParticles(this.level.theme);
+
+    for (const e of this.ents) {
+      e.x *= fx; e.baseX *= fx; e.y *= fy;
+      e.speed *= fy; e.drift *= fx; e.push *= fx; e.chase *= fx;
+      if (e.sway) e.sway.amp *= fx;
+      if (e.kind === 'barrier') {
+        /* the band spans the field, so it has to be redrawn at the new width */
+        e.gap *= fx; e.gapX *= fx; e.h = 34 * Layout.ky;
+        e.el.innerHTML = SPRITES.barrier.make({ gap: e.gap, gapX: e.gapX, style: e.props.style });
+      } else if (e.kind === 'bolt') {
+        e.width *= fx;
+        e.el.innerHTML = SPRITES.bolt.make({ width: e.width });
+        e.el.setAttribute('transform', 'translate(' + e.x.toFixed(1) + ',0)');
+        if (e.phase === 'strike') {
+          e.el.querySelector('.warn').style.display = 'none';
+          e.el.querySelector('.strike').style.display = '';
+        }
+      }
+    }
+    const p = this.player;
+    p.x = clamp(p.x * fx, p.r, W - p.r);
+    p.y = clamp(p.y * fy, Y_MIN, Y_MAX);
+    p.accel = 1750 * p.ty.accel * Layout.kx;
+    p.top = 380 * p.ty.top * Layout.kx;
+    this.balloonScale = 0.62 * Layout.k;
+    p.r = p.ty.r * this.balloonScale + 3;
+    this.redrawPlayer();
+    this.computeEase();
+  },
+
   /* -------------------------------------------------------- background -- */
   buildBackground(th) {
     const bg = $('lBg'), defs = $('defs');
@@ -58,12 +119,13 @@ const Game = {
     el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#skyGrad)' }, bg);
 
     if (th.sun) {
-      const sx = 640, sy = 120;
+      const sx = W * 0.8, sy = H * 0.2;
       bg.appendChild(gfx('<g><circle cx="' + sx + '" cy="' + sy + '" r="86" fill="#fff6c9" opacity=".28"/>' +
         '<circle cx="' + sx + '" cy="' + sy + '" r="44" fill="#fff3ad" opacity=".85"/></g>'));
     } else if (th.light === 'night') {
-      bg.appendChild(gfx('<g><circle cx="150" cy="110" r="46" fill="#e9f1ff" opacity=".9"/>' +
-        '<circle cx="132" cy="98" r="40" fill="' + th.sky[0] + '" opacity=".9"/></g>'));
+      const mx = W * 0.19, my = H * 0.18;
+      bg.appendChild(gfx('<g><circle cx="' + mx + '" cy="' + my + '" r="46" fill="#e9f1ff" opacity=".9"/>' +
+        '<circle cx="' + (mx - 18) + '" cy="' + (my - 12) + '" r="40" fill="' + th.sky[0] + '" opacity=".9"/></g>'));
     }
 
     /* parallax cloud bands */
@@ -91,7 +153,9 @@ const Game = {
     const kind = th.particles || 'none';
     if (kind === 'none') return;
     const layer = $('lParts');
-    const count = { rain: 90, snow: 70, leaves: 26, pollen: 44, dust: 40, stars: 60 }[kind] || 40;
+    const base = { rain: 90, snow: 70, leaves: 26, pollen: 44, dust: 40, stars: 60 }[kind] || 40;
+    /* keep the density per unit area, not per screen */
+    const count = Math.round(clamp(base * (W * H) / (BASE_W * BASE_H), 12, base * 1.4));
     for (let i = 0; i < count; i++) {
       let m;
       if (kind === 'rain') m = '<path d="M0,0 l-2,14" stroke="#cfe6f7" stroke-width="1.6" opacity=".7"/>';
@@ -105,21 +169,22 @@ const Game = {
       layer.appendChild(e);
       this.parts.push({
         el: e, x: rand(0, W), y: rand(0, H), kind,
-        sp: kind === 'rain' ? rand(430, 620) : kind === 'stars' ? rand(6, 18) : rand(40, 130),
-        dx: rand(-20, 20), ph: rand(0, 6.3)
+        sp: (kind === 'rain' ? rand(430, 620) : kind === 'stars' ? rand(6, 18) : rand(40, 130)) * Layout.ky,
+        dx: rand(-20, 20) * Layout.kx, ph: rand(0, 6.3)
       });
     }
   },
 
   buildPlayer() {
     const ty = typeOf(Save.data.type);
-    const g = gfx(balloonMarkup(ty.id, Save.data.colour, { scale: 0.62 }));
+    this.balloonScale = 0.62 * Layout.k;
+    const g = gfx(balloonMarkup(ty.id, Save.data.colour, { scale: this.balloonScale }));
     $('lPlayer').appendChild(g);
     this.playerEl = g;
     this.player = {
       x: W / 2, y: HOME_Y, vx: 0, vy: 0,
-      r: ty.r * 0.62 + 3, ty,
-      accel: 1750 * ty.accel, drag: ty.drag, top: 380 * ty.top
+      r: ty.r * this.balloonScale + 3, ty,
+      accel: 1750 * ty.accel * Layout.kx, drag: ty.drag, top: 380 * ty.top * Layout.kx
     };
     this.redrawPlayer();
   },
@@ -128,7 +193,8 @@ const Game = {
   redrawPlayer() {
     const ty = this.player.ty;
     const patched = clamp((this.initialStickers || 0) - this.stickers, 0, 5);
-    this.playerEl.innerHTML = balloonMarkup(ty.id, Save.data.colour, { scale: 0.62, patches: patched });
+    this.playerEl.innerHTML = balloonMarkup(ty.id, Save.data.colour,
+      { scale: this.balloonScale, patches: patched });
   },
 
   /* --------------------------------------------------------------- tick -- */
@@ -143,7 +209,7 @@ const Game = {
     Sound.windSet(0.15 + Math.abs(this.wind) / 220);
 
     /* ---- input and horizontal movement (the skill) ---- */
-    let ax = Input.x * p.accel + this.wind * 2.2;
+    let ax = Input.x * p.accel + this.wind * 2.2 * Layout.kx;
     p.vx += ax * dt;
     p.vx -= p.vx * p.drag * dt;
     p.vx = clamp(p.vx, -p.top * 1.4, p.top * 1.4);
@@ -152,7 +218,7 @@ const Game = {
     if (p.x > W - p.r - 6) { p.x = W - p.r - 6; p.vx = -Math.abs(p.vx) * 0.3; }
 
     /* vertical nudge, springs back to the resting line */
-    p.vy += (Input.y * 520 - (p.y - HOME_Y) * 1.9) * dt;
+    p.vy += (Input.y * 520 * Layout.ky - (p.y - HOME_Y) * 1.9) * dt;
     p.vy -= p.vy * 3.4 * dt;
     p.y = clamp(p.y + p.vy * dt, Y_MIN, Y_MAX);
 
@@ -172,10 +238,10 @@ const Game = {
       sp.next -= dt;
       if (sp.next <= 0) {
         const d = sp.def;
-        sp.next = (d.every || 2) + rand(-(d.jitter || 0), d.jitter || 0);
+        sp.next = ((d.every || 2) + rand(-(d.jitter || 0), d.jitter || 0)) * this.ease;
         if (sp.next < 0.25) sp.next = 0.25;
-        const count = d.count || 1, spread = d.spread || 0;
-        const baseX = rand(70, W - 70);
+        const count = d.count || 1, spread = (d.spread || 0) * Layout.kx;
+        const baseX = rand(W * 0.09, W * 0.91);
         for (let i = 0; i < count; i++) {
           const off = count > 1 ? (i - (count - 1) / 2) * spread : 0;
           this.spawn(d.sprite, d.props || {}, baseX + off);
@@ -190,8 +256,9 @@ const Game = {
     /* ---- render player ---- */
     const tilt = clamp(p.vx / p.top, -1, 1) * 22;
     const blink = this.invuln > 0 && (Math.sin(this.t * 32) > 0);
+    const knot = 48 * this.balloonScale;   /* the balloon hangs above the knot */
     this.playerEl.setAttribute('transform',
-      'translate(' + p.x.toFixed(1) + ',' + (p.y + 30).toFixed(1) + ') rotate(' + (-tilt).toFixed(1) + ')');
+      'translate(' + p.x.toFixed(1) + ',' + (p.y + knot).toFixed(1) + ') rotate(' + (-tilt).toFixed(1) + ')');
     this.playerEl.setAttribute('opacity', blink ? 0.35 : 1);
 
     UI.syncHud(prog, speedFrac);
@@ -200,10 +267,10 @@ const Game = {
   },
 
   updateBackground(dt) {
-    const scroll = this.level.scroll;
+    const scroll = this.level.scroll * Layout.ky;
     for (const b of this.bands) {
-      b.y += (b.sp + scroll * 0.28) * dt;
-      b.x += this.wind * 0.35 * dt;
+      b.y += (b.sp * Layout.ky + scroll * 0.28) * dt;
+      b.x += this.wind * Layout.kx * 0.35 * dt;
       if (b.y > H + 120) { b.y = -140; b.x = rand(-60, W + 60); }
       if (b.x < -260) b.x = W + 200; if (b.x > W + 260) b.x = -200;
       b.el.setAttribute('transform', 'translate(' + b.x.toFixed(1) + ',' + b.y.toFixed(1) + ') scale(' + b.sc.toFixed(2) + ')');
@@ -211,14 +278,15 @@ const Game = {
   },
 
   updateParticles(dt) {
+    const scroll = this.level.scroll * Layout.ky;
     for (const q of this.parts) {
       if (q.kind === 'stars') {
-        q.y += (q.sp + this.level.scroll * 0.08) * dt;
+        q.y += (q.sp + scroll * 0.08) * dt;
       } else {
-        q.y += (q.sp + this.level.scroll * 0.5) * dt;
-        q.x += (q.dx + this.wind * 1.5) * dt;
+        q.y += (q.sp + scroll * 0.5) * dt;
+        q.x += (q.dx + this.wind * Layout.kx * 1.5) * dt;
         if (q.kind === 'leaves' || q.kind === 'pollen')
-          q.x += Math.sin(this.t * 2 + q.ph) * 18 * dt;
+          q.x += Math.sin(this.t * 2 + q.ph) * 18 * Layout.kx * dt;
       }
       if (q.y > H + 20) { q.y = -20; q.x = rand(-40, W + 40); }
       if (q.x < -40) q.x = W + 30; if (q.x > W + 40) q.x = -30;
@@ -229,40 +297,48 @@ const Game = {
   /* -------------------------------------------------------------- spawn -- */
   spawn(name, props, x) {
     const def = SPRITES[name];
-    if (!def) return;
+    if (!def) { console.warn('unknown sprite "' + name + '" in level ' + this.level.id); return; }
     const p = Object.assign({}, props);
+    const kx = Layout.kx, ky = Layout.ky;
+    const sc = (p.scale || 1) * Layout.k;
     const e = {
-      name, def, kind: def.kind, t: 0,
-      x: x, baseX: x, y: -70, r: (def.r || 0) * (p.scale || 1),
-      speed: p.speed || 0, drift: p.drift || 0,
-      sway: p.sway || null, push: p.push || 0, lift: p.lift || 0,
-      chase: p.chase || 0, damage: p.damage == null ? 1 : p.damage,
-      h: def.h || 0, dead: false, phase: 'live', props: p
+      name, def, kind: def.kind, t: 0, sc,
+      x: x, baseX: x, y: -70 * ky, r: (def.r || 0) * sc,
+      speed: (p.speed || 0) * ky, drift: (p.drift || 0) * kx,
+      sway: p.sway ? { amp: p.sway.amp * kx, freq: p.sway.freq } : null,
+      push: (p.push || 0) * kx, lift: p.lift || 0,
+      chase: (p.chase || 0) * kx, damage: p.damage == null ? 1 : p.damage,
+      h: (def.h || 0) * sc, dead: false, phase: 'live', props: p
     };
 
     if (name === 'barrier') {
-      const gap = p.gap || 180;
+      /* the gap scales with the field, but never below what the balloon can
+         physically fit through with room to aim */
+      const gap = Math.max((p.gap || 180) * kx * this.ease, this.player.r * 5.2);
       e.gap = gap;
-      e.gapX = clamp(rand(gap / 2 + 30, W - gap / 2 - 30), gap / 2 + 20, W - gap / 2 - 20);
+      const edge = gap / 2 + 24 * kx;
+      e.gapX = clamp(rand(edge, W - edge), edge, W - edge);
       /* push the gap away from where the player currently is: that is the test */
-      if (Math.abs(e.gapX - this.player.x) < 190) {
+      if (Math.abs(e.gapX - this.player.x) < W * 0.24) {
         e.gapX = this.player.x < W / 2
-          ? clamp(this.player.x + rand(240, 430), gap / 2 + 24, W - gap / 2 - 24)
-          : clamp(this.player.x - rand(240, 430), gap / 2 + 24, W - gap / 2 - 24);
+          ? clamp(this.player.x + rand(W * 0.3, W * 0.54), edge, W - edge)
+          : clamp(this.player.x - rand(W * 0.3, W * 0.54), edge, W - edge);
       }
       e.x = 0; e.baseX = 0;
-      e.y = -50;
+      e.y = -50 * ky;
+      e.h = 34 * ky;
       e.el = gfx(def.make({ gap: gap, gapX: e.gapX, style: p.style }));
       e.warned = false;
     } else if (name === 'bolt') {
-      e.x = clamp(rand(60, W - 60), 40, W - 40);
+      e.width = (p.width || 30) * kx;
+      e.x = clamp(rand(W * 0.08, W * 0.92), e.width, W - e.width);
       e.baseX = e.x; e.y = 0;
       e.warn = p.warn || 1; e.strike = p.strike || 0.3;
-      e.el = gfx(def.make({ width: p.width || 30 }));
+      e.el = gfx(def.make({ width: e.width }));
       e.el.setAttribute('transform', 'translate(' + e.x.toFixed(1) + ',0)');
       Sound.zap();
     } else if (def.kind === 'zone') {
-      e.h = def.h;
+      e.h = def.h * sc;
       e.dir = Math.random() < 0.5 ? -1 : 1;
       e.el = gfx(def.make({ dir: e.dir }));
       if (name === 'gust') Sound.whoosh();
@@ -279,6 +355,7 @@ const Game = {
   /* ----------------------------------------------------------- entities -- */
   updateEntities(dt) {
     const L = this.level, p = this.player;
+    const scroll = L.scroll * Layout.ky;
     for (let i = this.ents.length - 1; i >= 0; i--) {
       const e = this.ents[i];
       e.t += dt;
@@ -290,14 +367,14 @@ const Game = {
       }
 
       /* vertical: world scroll plus the entity's own fall speed */
-      e.y += (L.scroll + e.speed) * dt;
+      e.y += (scroll + e.speed) * dt;
 
       if (e.kind === 'barrier') {
         e.el.setAttribute('transform', 'translate(0,' + e.y.toFixed(1) + ')');
         if (!e.warned && e.y > -20) { e.warned = true; }
         this.hitBarrier(e);
       } else {
-        e.baseX += (e.drift + this.wind * (e.kind === 'soft' ? 1.4 : 0.35)) * dt;
+        e.baseX += (e.drift + this.wind * Layout.kx * (e.kind === 'soft' ? 1.4 : 0.35)) * dt;
         if (e.chase) {
           const dir = Math.sign(p.x - e.baseX);
           e.baseX += dir * e.chase * dt;
@@ -306,16 +383,17 @@ const Game = {
         let tr = 'translate(' + e.x.toFixed(1) + ',' + e.y.toFixed(1) + ')';
         if (e.name === 'meteor') {
           /* meteors point along their own travel */
-          tr += ' rotate(' + (Math.atan2(L.scroll + e.speed, e.drift) * 57.3).toFixed(1) + ')';
+          tr += ' rotate(' + (Math.atan2(scroll + e.speed, e.drift) * 57.3).toFixed(1) + ')';
         } else if (e.rot != null && e.def.spin !== false && e.kind !== 'zone' && e.kind !== 'decor') {
           e.rot += e.spin * dt;
           tr += ' rotate(' + e.rot.toFixed(1) + ')';
         }
+        if (e.sc !== 1) tr += ' scale(' + e.sc.toFixed(3) + ')';
         e.el.setAttribute('transform', tr);
         this.hitEntity(e, dt);
       }
 
-      if (e.y > H + 140 || e.dead) {
+      if (e.y > H + 140 * Layout.ky || e.dead) {
         e.el.remove();
         this.ents.splice(i, 1);
         if (!e.dead && e.kind === 'hazard') this.score += 12;   /* dodged */
@@ -337,7 +415,7 @@ const Game = {
     } else if (e.phase === 'strike') {
       e.strike -= dt;
       const p = this.player;
-      const w = (e.props.width || 30) / 2 + p.r * 0.55;
+      const w = e.width / 2 + p.r * 0.55;
       if (Math.abs(p.x - e.x) < w) this.hurt('struck by lightning');
       if (e.strike <= 0) e.dead = true;
     }
@@ -361,7 +439,7 @@ const Game = {
       if (Math.abs(dy) < e.h / 2 + p.r) {
         if (e.lift) {                       /* updraft: free altitude, gentle lift */
           this.alt += e.lift * dt;
-          p.vy -= 150 * dt;
+          p.vy -= 150 * Layout.ky * dt;
           if (!e.scored) { e.scored = true; UI.toast('updraft'); }
         } else {                            /* gust: shoves you sideways */
           p.vx += e.dir * (e.push || 200) * dt;

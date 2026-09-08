@@ -6,13 +6,13 @@
   "targetAltitude": 2050,
   "climb": 59,
   "scroll": 180,
-  "startStickers": 3,
+  "startStickers": 4,
   "wind": { "base": -35, "gust": 120, "period": 4 },
   "theme": { "sky": ["#141c33", "#3a4a72"], "light": "night", "sun": false, "particles": "stars", "cloudBands": 3, "flash": false },
   "spawners": [
-    { "sprite": "meteor", "every": 0.85, "jitter": 0.3, "props": { "speed": 230, "drift": 150 } },
-    { "sprite": "meteor", "every": 1.1, "jitter": 0.4, "props": { "speed": 230, "drift": -150 } },
-    { "sprite": "hail", "every": 0.6, "jitter": 0.25, "count": 2, "spread": 110, "props": { "speed": 120 } },
+    { "sprite": "meteor", "every": 1.5, "jitter": 0.4, "props": { "speed": 230, "drift": 150 } },
+    { "sprite": "meteor", "every": 1.5, "jitter": 0.4, "props": { "speed": 230, "drift": -150 } },
+    { "sprite": "hail", "every": 1.3, "jitter": 0.35, "count": 2, "spread": 110, "props": { "speed": 120 } },
     { "sprite": "barrier", "from": 0.15, "every": 5, "jitter": 0.7, "props": { "style": "ice", "gap": 150 } },
     { "sprite": "updraft", "every": 8, "jitter": 2, "props": { "speed": -30, "lift": 50 } },
     { "sprite": "sticker", "every": 8, "jitter": 2 }
