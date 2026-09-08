@@ -1,0 +1,20 @@
+{
+  "id": 4,
+  "name": "Autumn Gale",
+  "subtitle": "A whole forest went up",
+  "hint": "Leaves shove you but never pop you. Twigs do. Ride the gust bands.",
+  "targetAltitude": 1150,
+  "climb": 56,
+  "scroll": 115,
+  "startStickers": 3,
+  "wind": { "base": -15, "gust": 105, "period": 5.5 },
+  "theme": { "sky": ["#e6a15c", "#ffe6c4"], "light": "dusk", "sun": true, "particles": "leaves", "cloudBands": 4, "flash": false },
+  "spawners": [
+    { "sprite": "leaf", "every": 0.45, "jitter": 0.2, "count": 3, "spread": 90, "props": { "speed": 30, "push": 90 } },
+    { "sprite": "twig", "every": 2.1, "jitter": 0.7, "props": { "speed": 70, "drift": 45, "sway": { "amp": 20, "freq": 0.9 } } },
+    { "sprite": "bird", "every": 3.4, "jitter": 1, "props": { "speed": 40, "drift": 60 } },
+    { "sprite": "gust", "from": 0.15, "every": 5.5, "jitter": 1.2, "props": { "speed": 10, "push": 260 } },
+    { "sprite": "barrier", "from": 0.25, "every": 6, "jitter": 0.8, "props": { "style": "hedge", "gap": 180 } },
+    { "sprite": "sticker", "every": 10, "jitter": 2.5 }
+  ]
+}

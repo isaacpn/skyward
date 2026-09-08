@@ -1,0 +1,19 @@
+{
+  "id": 10,
+  "name": "Drone Corridor",
+  "subtitle": "Restricted airspace, apparently",
+  "hint": "Drones track your side of the screen. Fake one way, then go the other.",
+  "targetAltitude": 1900,
+  "climb": 58,
+  "scroll": 170,
+  "startStickers": 3,
+  "wind": { "base": 15, "gust": 70, "period": 5 },
+  "theme": { "sky": ["#3d4a63", "#9fb6c9"], "light": "dusk", "sun": false, "particles": "dust", "cloudBands": 3, "flash": false },
+  "spawners": [
+    { "sprite": "drone", "every": 1.7, "jitter": 0.5, "props": { "speed": 70, "chase": 55 } },
+    { "sprite": "spark", "every": 0.7, "jitter": 0.3, "count": 2, "spread": 100, "props": { "speed": 145 } },
+    { "sprite": "barrier", "from": 0.1, "every": 4.4, "jitter": 0.6, "props": { "style": "laser", "gap": 150 } },
+    { "sprite": "bolt", "from": 0.45, "every": 6.5, "jitter": 1.5, "props": { "warn": 0.8, "strike": 0.28, "width": 34 } },
+    { "sprite": "sticker", "every": 8.5, "jitter": 2 }
+  ]
+}

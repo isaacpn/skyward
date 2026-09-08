@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "levels": [
+    "01-first-light.json", "02-morning-meadow.json", "03-breezy-ridge.json",
+    "04-autumn-gale.json", "05-kite-festival.json", "06-thunderhead.json",
+    "07-storm-front.json", "08-hail-alley.json", "09-thorn-updraft.json",
+    "10-drone-corridor.json", "11-meteor-shower.json", "12-edge-of-space.json"
+  ]
+}

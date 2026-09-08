@@ -1,0 +1,19 @@
+{
+  "id": 3,
+  "name": "Breezy Ridge",
+  "subtitle": "The air has opinions",
+  "hint": "Wind pushes constantly. Lean against it before you need to.",
+  "targetAltitude": 1000,
+  "climb": 55,
+  "scroll": 105,
+  "startStickers": 3,
+  "wind": { "base": 20, "gust": 70, "period": 7 },
+  "theme": { "sky": ["#57b6ea", "#dceffb"], "light": "day", "sun": true, "particles": "leaves", "cloudBands": 4, "flash": false },
+  "spawners": [
+    { "sprite": "bird", "every": 2.3, "jitter": 0.7, "props": { "speed": 34, "drift": 40, "sway": { "amp": 26, "freq": 0.6 } } },
+    { "sprite": "leaf", "every": 0.8, "jitter": 0.4, "count": 3, "spread": 70, "props": { "speed": 22, "push": 70 } },
+    { "sprite": "twig", "from": 0.2, "every": 3.4, "jitter": 1, "props": { "speed": 55, "drift": 30 } },
+    { "sprite": "barrier", "from": 0.2, "every": 6.5, "jitter": 1, "props": { "style": "hedge", "gap": 190 } },
+    { "sprite": "sticker", "every": 11, "jitter": 3 }
+  ]
+}

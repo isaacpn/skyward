@@ -1,0 +1,21 @@
+{
+  "id": 12,
+  "name": "Edge of Space",
+  "subtitle": "Thin air, sharp everything",
+  "hint": "Everything at once. The only rule left is: never stop moving sideways.",
+  "targetAltitude": 2300,
+  "climb": 60,
+  "scroll": 195,
+  "startStickers": 3,
+  "wind": { "base": 0, "gust": 175, "period": 3.2 },
+  "theme": { "sky": ["#0a1030", "#2b1b4d"], "light": "night", "sun": false, "particles": "stars", "cloudBands": 2, "flash": true },
+  "spawners": [
+    { "sprite": "shard", "every": 0.5, "jitter": 0.2, "count": 2, "spread": 120, "props": { "speed": 150, "sway": { "amp": 55, "freq": 1.1 } } },
+    { "sprite": "meteor", "every": 1.3, "jitter": 0.4, "props": { "speed": 250, "drift": 170 } },
+    { "sprite": "orb", "every": 2.4, "jitter": 0.6, "props": { "speed": 60, "chase": 70 } },
+    { "sprite": "bolt", "every": 3.4, "jitter": 0.7, "count": 2, "spread": 240, "props": { "warn": 0.75, "strike": 0.3, "width": 34 } },
+    { "sprite": "barrier", "every": 4.2, "jitter": 0.5, "props": { "style": "laser", "gap": 145 } },
+    { "sprite": "updraft", "every": 7, "jitter": 1.5, "props": { "speed": -30, "lift": 55 } },
+    { "sprite": "sticker", "every": 7.5, "jitter": 1.5 }
+  ]
+}

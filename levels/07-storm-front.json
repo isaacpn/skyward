@@ -1,0 +1,19 @@
+{
+  "id": 7,
+  "name": "Storm Front",
+  "subtitle": "Two bolts, and less warning",
+  "hint": "Bolts come in pairs now. Read both columns, then pick your lane.",
+  "targetAltitude": 1500,
+  "climb": 58,
+  "scroll": 145,
+  "startStickers": 3,
+  "wind": { "base": 0, "gust": 135, "period": 4.5 },
+  "theme": { "sky": ["#2f3b52", "#6d7f97"], "light": "storm", "sun": false, "particles": "rain", "cloudBands": 5, "flash": true },
+  "spawners": [
+    { "sprite": "hail", "every": 0.5, "jitter": 0.2, "count": 2, "spread": 90, "props": { "speed": 125 } },
+    { "sprite": "bolt", "every": 3.6, "jitter": 0.8, "count": 2, "spread": 260, "props": { "warn": 0.9, "strike": 0.3, "width": 30 } },
+    { "sprite": "gust", "every": 4.5, "jitter": 1, "props": { "speed": 20, "push": 300 } },
+    { "sprite": "barrier", "from": 0.15, "every": 5.5, "jitter": 0.8, "props": { "style": "hail", "gap": 165 } },
+    { "sprite": "sticker", "every": 9, "jitter": 2 }
+  ]
+}

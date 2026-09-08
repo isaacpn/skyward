@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Skyward</title>
+<style>
+  :root{
+    --ink:#12203a; --paper:#f7fbff; --edge:rgba(10,25,50,.14);
+    --accent:#ff5d7a; --accent2:#3fb8ff; --gold:#ffc94d;
+    --panel:rgba(255,255,255,.92);
+    --shadow:0 18px 44px -18px rgba(10,25,50,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:#0b1424; color:var(--ink);
+    font:14px/1.5 ui-rounded,"Nunito","Segoe UI Variable",Segoe UI,system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; -webkit-user-select:none; user-select:none; touch-action:none;
+  }
+  #app{position:relative; width:min(100vw,calc(100vh * 4 / 3)); height:min(100vh,calc(100vw * 3 / 4));
+       box-shadow:var(--shadow); overflow:hidden; background:#8fd0f0}
+  #stage{position:absolute; inset:0; width:100%; height:100%; display:block}
+  .shake{animation:shake .32s ease}
+  @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-7px,3px)}50%{transform:translate(6px,-4px)}75%{transform:translate(-4px,-2px)}}
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s}
+  #hud.on{opacity:1}
+  .hud-top{position:absolute; top:0; left:0; right:0; display:flex; align-items:flex-start;
+           justify-content:space-between; padding:12px 14px; gap:10px}
+  .chip{background:var(--panel); border-radius:14px; padding:7px 12px; backdrop-filter:blur(6px);
+        box-shadow:0 6px 18px -8px rgba(10,25,50,.6); font-weight:800; letter-spacing:.2px}
+  .chip small{display:block; font-weight:700; opacity:.55; font-size:10px; text-transform:uppercase; letter-spacing:.09em}
+  #stickerRow{display:flex; gap:5px; margin-top:5px}
+  .sticker-pip{width:17px; height:17px; border-radius:50%; background:var(--gold);
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.18); border:2px solid #fff; transition:transform .18s, opacity .18s}
+  .sticker-pip.spent{opacity:.22; transform:scale(.7)}
+  .hud-right{display:flex; flex-direction:column; align-items:flex-end; gap:8px}
+  .btn-icon{pointer-events:auto; width:36px; height:36px; border-radius:12px; border:0; cursor:pointer;
+    background:var(--panel); font-size:16px; box-shadow:0 6px 18px -8px rgba(10,25,50,.6)}
+  #altWrap{position:absolute; right:16px; top:104px; bottom:26px; width:10px;
+    background:rgba(255,255,255,.42); border-radius:6px; overflow:hidden}
+  #altFill{position:absolute; left:0; right:0; bottom:0; height:0%;
+    background:linear-gradient(180deg,var(--accent2),#b9f0ff); border-radius:6px}
+  #speedWrap{position:absolute; left:50%; transform:translateX(-50%); bottom:16px; width:170px; height:7px;
+    background:rgba(255,255,255,.42); border-radius:5px; overflow:hidden}
+  #speedFill{height:100%; width:0%; background:linear-gradient(90deg,var(--gold),var(--accent))}
+  #speedLabel{position:absolute; left:50%; transform:translateX(-50%); bottom:28px; font-size:10px;
+    font-weight:900; text-transform:uppercase; letter-spacing:.14em; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,.45)}
+  #toast{position:absolute; left:50%; top:38%; transform:translate(-50%,-50%); font-weight:900;
+    font-size:26px; color:#fff; text-shadow:0 4px 16px rgba(0,0,0,.5); opacity:0; pointer-events:none; white-space:nowrap}
+  #toast.show{animation:toast 1.15s ease forwards}
+  @keyframes toast{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}18%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}
+    70%{opacity:1}100%{opacity:0;transform:translate(-50%,-80%) scale(1)}}
+
+  /* ---------- Screens ---------- */
+  #screens{position:absolute; inset:0}
+  .screen{position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    padding:22px; text-align:center; overflow-y:auto;
+    background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.5),rgba(120,180,225,.72));
+    backdrop-filter:blur(9px)}
+  .screen.on{display:flex; animation:fade .28s ease}
+  @keyframes fade{from{opacity:0; transform:scale(.98)}to{opacity:1; transform:none}}
+  .card{background:var(--panel); border-radius:24px; padding:26px 28px; max-width:640px; width:100%;
+    box-shadow:var(--shadow); border:1px solid rgba(255,255,255,.7)}
+  h1{margin:0 0 4px; font-size:40px; letter-spacing:-.5px; line-height:1}
+  h2{margin:0 0 14px; font-size:24px; letter-spacing:-.3px}
+  .sub{margin:0 0 18px; opacity:.66; font-weight:600}
+  .btn{border:0; cursor:pointer; font:inherit; font-weight:900; letter-spacing:.2px;
+    padding:13px 26px; border-radius:15px; background:var(--accent); color:#fff;
+    box-shadow:0 10px 22px -10px var(--accent); transition:transform .12s, filter .12s; font-size:16px}
+  .btn:hover{transform:translateY(-2px); filter:brightness(1.06)}
+  .btn:active{transform:translateY(0)}
+  .btn.ghost{background:rgba(18,32,58,.08); color:var(--ink); box-shadow:none}
+  .btn.small{padding:9px 16px; font-size:13px}
+  .row{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:16px}
+  .keys{display:inline-flex; gap:6px; align-items:center; opacity:.7; font-weight:700; font-size:12px; margin-top:14px}
+  kbd{background:#fff; border:1px solid var(--edge); border-bottom-width:2px; border-radius:6px; padding:2px 7px; font:inherit; font-weight:800}
+
+  .swatches{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:6px 0 18px}
+  .sw{width:38px; height:38px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:transform .14s}
+  .sw:hover{transform:scale(1.1)}
+  .sw.sel{border-color:var(--ink); transform:scale(1.14)}
+  .types{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:6px}
+  .type{cursor:pointer; border:2px solid var(--edge); border-radius:16px; padding:8px 4px 6px; background:#fff;
+    transition:transform .14s, border-color .14s}
+  .type:hover{transform:translateY(-3px)}
+  .type.sel{border-color:var(--accent); box-shadow:0 8px 20px -12px var(--accent)}
+  .type svg{width:100%; height:74px; display:block}
+  .type b{font-size:12px; display:block}
+  .type span{font-size:10px; opacity:.6; display:block; line-height:1.3}
+
+  .levels{display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:6px 0 4px}
+  .lv{cursor:pointer; border:2px solid var(--edge); border-radius:14px; padding:9px 6px; background:#fff;
+    text-align:left; transition:transform .14s, border-color .14s; position:relative; font:inherit; color:inherit}
+  .lv:hover{transform:translateY(-3px); border-color:var(--accent2)}
+  .lv .n{font-size:10px; font-weight:900; opacity:.45}
+  .lv .t{font-size:12px; font-weight:900; line-height:1.15; margin-top:1px}
+  .lv .s{font-size:10px; opacity:.6; margin-top:3px}
+  .lv.locked{opacity:.44; cursor:not-allowed; background:#eef2f7}
+  .lv.locked:hover{transform:none; border-color:var(--edge)}
+  .lv .star{position:absolute; top:6px; right:7px; font-size:11px}
+  .stat{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--edge); font-weight:700; gap:12px}
+  .stat:last-of-type{border:0}
+  .stat span:last-child{font-weight:900; text-align:right}
+  .hintline{margin-top:14px; font-size:12px; opacity:.7; font-weight:700}
+  @media (max-width:620px){
+    h1{font-size:30px} .card{padding:18px}
+    .types{grid-template-columns:repeat(2,1fr)} .levels{grid-template-columns:repeat(3,1fr)}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <svg id="stage" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" aria-label="Skyward game">
+    <defs id="defs"></defs>
+    <g id="lBg"></g>
+    <g id="lParts"></g>
+    <g id="lWorld"></g>
+    <g id="lPlayer"></g>
+    <g id="lFx"></g>
+  </svg>
+
+  <div id="hud">
+    <div class="hud-top">
+      <div>
+        <div class="chip"><small id="hudLevel">Level 1</small><span id="hudAlt">0 m</span>
+          <div id="stickerRow"></div>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="chip" style="text-align:right"><small>Score</small><span id="hudScore">0</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-icon" id="btnMute" title="Sound">&#128266;</button>
+          <button class="btn-icon" id="btnPause" title="Pause">&#10073;&#10073;</button>
+        </div>
+      </div>
+    </div>
+    <div id="altWrap"><div id="altFill"></div></div>
+    <div id="speedLabel">slipstream</div>
+    <div id="speedWrap"><div id="speedFill"></div></div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="screens">
+    <section class="screen on" id="scTitle">
+      <div class="card">
+        <svg viewBox="0 0 120 132" style="width:112px;height:124px;margin-bottom:2px"><g id="titleBalloon"></g></svg>
+        <h1>Skyward</h1>
+        <p class="sub">A balloon, an atmosphere, and everything in it that would like to pop you.</p>
+        <div class="row">
+          <button class="btn" id="btnPlay">Choose your balloon</button>
+          <button class="btn ghost" id="btnHow">How to play</button>
+        </div>
+        <div class="keys"><kbd>&#8592;</kbd><kbd>&#8594;</kbd> or <kbd>A</kbd><kbd>D</kbd> to steer &middot; drag on touch</div>
+      </div>
+    </section>
+
+    <section class="screen" id="scHow">
+      <div class="card" style="text-align:left">
+        <h2>How to play</h2>
+        <div class="stat"><span>Steer</span><span>Arrow keys / A D / drag</span></div>
+        <div class="stat"><span>Nudge up and down</span><span>Up / Down arrows</span></div>
+        <div class="stat"><span>Climb faster</span><span>Move sideways at speed</span></div>
+        <div class="stat"><span>Stickers</span><span>Patch one prick each</span></div>
+        <div class="stat"><span>No stickers left</span><span>The next prick pops you</span></div>
+        <p class="sub" style="margin-top:16px">Hazards fall from above: birds, twigs, hail, kite string, lightning.
+        Leaves and gusts only shove you around. Hedges, ice walls and laser lines have exactly one gap, so learn to
+        cross the whole screen quickly. That is the whole skill.</p>
+        <div class="row"><button class="btn" id="btnHowBack">Got it</button></div>
+      </div>
+    </section>
+
+    <section class="screen" id="scPick">
+      <div class="card">
+        <h2>Pick your balloon</h2>
+        <div class="swatches" id="swatches"></div>
+        <div class="types" id="types"></div>
+        <p class="sub" id="typeDesc" style="margin:12px 0 0"></p>
+        <div class="row">
+          <button class="btn ghost small" id="btnPickBack">Back</button>
+          <button class="btn" id="btnPickGo">To the levels</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scLevels">
+      <div class="card">
+        <h2>Choose an altitude</h2>
+        <p class="sub" style="margin-bottom:12px">Clear a level to unlock the next one.</p>
+        <div class="levels" id="levelGrid"></div>
+        <div class="row">
+          <button class="btn ghost small" id="btnLevelsBack">Change balloon</button>
+          <button class="btn ghost small" id="btnReset">Reset progress</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scBrief">
+      <div class="card">
+        <p id="briefNo" style="margin:0 0 2px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; font-size:11px; opacity:.5"></p>
+        <h2 id="briefName"></h2>
+        <p class="sub" id="briefSub" style="margin-bottom:14px"></p>
+        <div class="stat"><span>Target altitude</span><span id="briefAlt"></span></div>
+        <div class="stat"><span>Wind</span><span id="briefWind"></span></div>
+        <div class="stat"><span>Hazards</span><span id="briefHaz"></span></div>
+        <p class="hintline" id="briefHint"></p>
+        <div class="row">
+          <button class="btn ghost small" id="btnBriefBack">Back</button>
+          <button class="btn" id="btnBriefGo">Launch</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scPause">
+      <div class="card">
+        <h2>Paused</h2>
+        <p class="sub" id="pauseHint"></p>
+        <div class="row">
+          <button class="btn" id="btnResume">Resume</button>
+          <button class="btn ghost" id="btnQuit">Quit to levels</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scWin">
+      <div class="card">
+        <h2 id="winTitle">Altitude reached</h2>
+        <p class="sub" id="winSub"></p>
+        <div class="stat"><span>Altitude</span><span id="winAlt"></span></div>
+        <div class="stat"><span>Stickers left</span><span id="winStick"></span></div>
+        <div class="stat"><span>Slipstream bonus</span><span id="winBonus"></span></div>
+        <div class="stat"><span>Score</span><span id="winScore"></span></div>
+        <div class="stat"><span>Best</span><span id="winBest"></span></div>
+        <div class="row">
+          <button class="btn" id="btnNext">Next level</button>
+          <button class="btn ghost" id="btnWinLevels">Levels</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scLose">
+      <div class="card">
+        <h2>Pop.</h2>
+        <p class="sub" id="loseSub"></p>
+        <div class="stat"><span>Altitude reached</span><span id="loseAlt"></span></div>
+        <div class="stat"><span>Score</span><span id="loseScore"></span></div>
+        <p class="hintline" id="loseHint"></p>
+        <div class="row">
+          <button class="btn" id="btnRetry">Try again</button>
+          <button class="btn ghost" id="btnLoseLevels">Levels</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<script>

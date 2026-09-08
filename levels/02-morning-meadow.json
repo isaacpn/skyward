@@ -1,0 +1,19 @@
+{
+  "id": 2,
+  "name": "Morning Meadow",
+  "subtitle": "Something is drifting up with you",
+  "hint": "Hedgerows have exactly one gap. Commit early and cross the whole screen.",
+  "targetAltitude": 900,
+  "climb": 54,
+  "scroll": 95,
+  "startStickers": 3,
+  "wind": { "base": 8, "gust": 10, "period": 9 },
+  "theme": { "sky": ["#63bff0", "#e6f7e9"], "light": "day", "sun": true, "particles": "pollen", "cloudBands": 3, "flash": false },
+  "spawners": [
+    { "sprite": "bird", "every": 2.6, "jitter": 0.8, "props": { "speed": 30, "drift": 26, "sway": { "amp": 24, "freq": 0.5 } } },
+    { "sprite": "leaf", "every": 1.1, "jitter": 0.5, "count": 2, "spread": 60, "props": { "speed": 18, "push": 55 } },
+    { "sprite": "barrier", "from": 0.25, "every": 7.5, "jitter": 1.2, "props": { "style": "hedge", "gap": 210 } },
+    { "sprite": "cloud", "every": 4, "jitter": 1.5, "props": { "speed": -25 } },
+    { "sprite": "sticker", "every": 11, "jitter": 3 }
+  ]
+}

@@ -1,0 +1,1477 @@
+<title>Skyward</title>
+<style>
+  :root{
+    --ink:#12203a; --paper:#f7fbff; --edge:rgba(10,25,50,.14);
+    --accent:#ff5d7a; --accent2:#3fb8ff; --gold:#ffc94d;
+    --panel:rgba(255,255,255,.92);
+    --shadow:0 18px 44px -18px rgba(10,25,50,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:#0b1424; color:var(--ink);
+    font:14px/1.5 ui-rounded,"Nunito","Segoe UI Variable",Segoe UI,system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; -webkit-user-select:none; user-select:none; touch-action:none;
+  }
+  #app{position:relative; width:min(100vw,calc(100vh * 4 / 3)); height:min(100vh,calc(100vw * 3 / 4));
+       box-shadow:var(--shadow); overflow:hidden; background:#8fd0f0}
+  #stage{position:absolute; inset:0; width:100%; height:100%; display:block}
+  .shake{animation:shake .32s ease}
+  @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-7px,3px)}50%{transform:translate(6px,-4px)}75%{transform:translate(-4px,-2px)}}
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s}
+  #hud.on{opacity:1}
+  .hud-top{position:absolute; top:0; left:0; right:0; display:flex; align-items:flex-start;
+           justify-content:space-between; padding:12px 14px; gap:10px}
+  .chip{background:var(--panel); border-radius:14px; padding:7px 12px; backdrop-filter:blur(6px);
+        box-shadow:0 6px 18px -8px rgba(10,25,50,.6); font-weight:800; letter-spacing:.2px}
+  .chip small{display:block; font-weight:700; opacity:.55; font-size:10px; text-transform:uppercase; letter-spacing:.09em}
+  #stickerRow{display:flex; gap:5px; margin-top:5px}
+  .sticker-pip{width:17px; height:17px; border-radius:50%; background:var(--gold);
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.18); border:2px solid #fff; transition:transform .18s, opacity .18s}
+  .sticker-pip.spent{opacity:.22; transform:scale(.7)}
+  .hud-right{display:flex; flex-direction:column; align-items:flex-end; gap:8px}
+  .btn-icon{pointer-events:auto; width:36px; height:36px; border-radius:12px; border:0; cursor:pointer;
+    background:var(--panel); font-size:16px; box-shadow:0 6px 18px -8px rgba(10,25,50,.6)}
+  #altWrap{position:absolute; right:16px; top:104px; bottom:26px; width:10px;
+    background:rgba(255,255,255,.42); border-radius:6px; overflow:hidden}
+  #altFill{position:absolute; left:0; right:0; bottom:0; height:0%;
+    background:linear-gradient(180deg,var(--accent2),#b9f0ff); border-radius:6px}
+  #speedWrap{position:absolute; left:50%; transform:translateX(-50%); bottom:16px; width:170px; height:7px;
+    background:rgba(255,255,255,.42); border-radius:5px; overflow:hidden}
+  #speedFill{height:100%; width:0%; background:linear-gradient(90deg,var(--gold),var(--accent))}
+  #speedLabel{position:absolute; left:50%; transform:translateX(-50%); bottom:28px; font-size:10px;
+    font-weight:900; text-transform:uppercase; letter-spacing:.14em; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,.45)}
+  #toast{position:absolute; left:50%; top:38%; transform:translate(-50%,-50%); font-weight:900;
+    font-size:26px; color:#fff; text-shadow:0 4px 16px rgba(0,0,0,.5); opacity:0; pointer-events:none; white-space:nowrap}
+  #toast.show{animation:toast 1.15s ease forwards}
+  @keyframes toast{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}18%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}
+    70%{opacity:1}100%{opacity:0;transform:translate(-50%,-80%) scale(1)}}
+
+  /* ---------- Screens ---------- */
+  #screens{position:absolute; inset:0}
+  .screen{position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    padding:22px; text-align:center; overflow-y:auto;
+    background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.5),rgba(120,180,225,.72));
+    backdrop-filter:blur(9px)}
+  .screen.on{display:flex; animation:fade .28s ease}
+  @keyframes fade{from{opacity:0; transform:scale(.98)}to{opacity:1; transform:none}}
+  .card{background:var(--panel); border-radius:24px; padding:26px 28px; max-width:640px; width:100%;
+    box-shadow:var(--shadow); border:1px solid rgba(255,255,255,.7)}
+  h1{margin:0 0 4px; font-size:40px; letter-spacing:-.5px; line-height:1}
+  h2{margin:0 0 14px; font-size:24px; letter-spacing:-.3px}
+  .sub{margin:0 0 18px; opacity:.66; font-weight:600}
+  .btn{border:0; cursor:pointer; font:inherit; font-weight:900; letter-spacing:.2px;
+    padding:13px 26px; border-radius:15px; background:var(--accent); color:#fff;
+    box-shadow:0 10px 22px -10px var(--accent); transition:transform .12s, filter .12s; font-size:16px}
+  .btn:hover{transform:translateY(-2px); filter:brightness(1.06)}
+  .btn:active{transform:translateY(0)}
+  .btn.ghost{background:rgba(18,32,58,.08); color:var(--ink); box-shadow:none}
+  .btn.small{padding:9px 16px; font-size:13px}
+  .row{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:16px}
+  .keys{display:inline-flex; gap:6px; align-items:center; opacity:.7; font-weight:700; font-size:12px; margin-top:14px}
+  kbd{background:#fff; border:1px solid var(--edge); border-bottom-width:2px; border-radius:6px; padding:2px 7px; font:inherit; font-weight:800}
+
+  .swatches{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:6px 0 18px}
+  .sw{width:38px; height:38px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:transform .14s}
+  .sw:hover{transform:scale(1.1)}
+  .sw.sel{border-color:var(--ink); transform:scale(1.14)}
+  .types{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:6px}
+  .type{cursor:pointer; border:2px solid var(--edge); border-radius:16px; padding:8px 4px 6px; background:#fff;
+    transition:transform .14s, border-color .14s}
+  .type:hover{transform:translateY(-3px)}
+  .type.sel{border-color:var(--accent); box-shadow:0 8px 20px -12px var(--accent)}
+  .type svg{width:100%; height:74px; display:block}
+  .type b{font-size:12px; display:block}
+  .type span{font-size:10px; opacity:.6; display:block; line-height:1.3}
+
+  .levels{display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:6px 0 4px}
+  .lv{cursor:pointer; border:2px solid var(--edge); border-radius:14px; padding:9px 6px; background:#fff;
+    text-align:left; transition:transform .14s, border-color .14s; position:relative; font:inherit; color:inherit}
+  .lv:hover{transform:translateY(-3px); border-color:var(--accent2)}
+  .lv .n{font-size:10px; font-weight:900; opacity:.45}
+  .lv .t{font-size:12px; font-weight:900; line-height:1.15; margin-top:1px}
+  .lv .s{font-size:10px; opacity:.6; margin-top:3px}
+  .lv.locked{opacity:.44; cursor:not-allowed; background:#eef2f7}
+  .lv.locked:hover{transform:none; border-color:var(--edge)}
+  .lv .star{position:absolute; top:6px; right:7px; font-size:11px}
+  .stat{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--edge); font-weight:700; gap:12px}
+  .stat:last-of-type{border:0}
+  .stat span:last-child{font-weight:900; text-align:right}
+  .hintline{margin-top:14px; font-size:12px; opacity:.7; font-weight:700}
+  @media (max-width:620px){
+    h1{font-size:30px} .card{padding:18px}
+    .types{grid-template-columns:repeat(2,1fr)} .levels{grid-template-columns:repeat(3,1fr)}
+  }
+</style>
+<div id="app">
+  <svg id="stage" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" aria-label="Skyward game">
+    <defs id="defs"></defs>
+    <g id="lBg"></g>
+    <g id="lParts"></g>
+    <g id="lWorld"></g>
+    <g id="lPlayer"></g>
+    <g id="lFx"></g>
+  </svg>
+
+  <div id="hud">
+    <div class="hud-top">
+      <div>
+        <div class="chip"><small id="hudLevel">Level 1</small><span id="hudAlt">0 m</span>
+          <div id="stickerRow"></div>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="chip" style="text-align:right"><small>Score</small><span id="hudScore">0</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-icon" id="btnMute" title="Sound">&#128266;</button>
+          <button class="btn-icon" id="btnPause" title="Pause">&#10073;&#10073;</button>
+        </div>
+      </div>
+    </div>
+    <div id="altWrap"><div id="altFill"></div></div>
+    <div id="speedLabel">slipstream</div>
+    <div id="speedWrap"><div id="speedFill"></div></div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="screens">
+    <section class="screen on" id="scTitle">
+      <div class="card">
+        <svg viewBox="0 0 120 132" style="width:112px;height:124px;margin-bottom:2px"><g id="titleBalloon"></g></svg>
+        <h1>Skyward</h1>
+        <p class="sub">A balloon, an atmosphere, and everything in it that would like to pop you.</p>
+        <div class="row">
+          <button class="btn" id="btnPlay">Choose your balloon</button>
+          <button class="btn ghost" id="btnHow">How to play</button>
+        </div>
+        <div class="keys"><kbd>&#8592;</kbd><kbd>&#8594;</kbd> or <kbd>A</kbd><kbd>D</kbd> to steer &middot; drag on touch</div>
+      </div>
+    </section>
+
+    <section class="screen" id="scHow">
+      <div class="card" style="text-align:left">
+        <h2>How to play</h2>
+        <div class="stat"><span>Steer</span><span>Arrow keys / A D / drag</span></div>
+        <div class="stat"><span>Nudge up and down</span><span>Up / Down arrows</span></div>
+        <div class="stat"><span>Climb faster</span><span>Move sideways at speed</span></div>
+        <div class="stat"><span>Stickers</span><span>Patch one prick each</span></div>
+        <div class="stat"><span>No stickers left</span><span>The next prick pops you</span></div>
+        <p class="sub" style="margin-top:16px">Hazards fall from above: birds, twigs, hail, kite string, lightning.
+        Leaves and gusts only shove you around. Hedges, ice walls and laser lines have exactly one gap, so learn to
+        cross the whole screen quickly. That is the whole skill.</p>
+        <div class="row"><button class="btn" id="btnHowBack">Got it</button></div>
+      </div>
+    </section>
+
+    <section class="screen" id="scPick">
+      <div class="card">
+        <h2>Pick your balloon</h2>
+        <div class="swatches" id="swatches"></div>
+        <div class="types" id="types"></div>
+        <p class="sub" id="typeDesc" style="margin:12px 0 0"></p>
+        <div class="row">
+          <button class="btn ghost small" id="btnPickBack">Back</button>
+          <button class="btn" id="btnPickGo">To the levels</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scLevels">
+      <div class="card">
+        <h2>Choose an altitude</h2>
+        <p class="sub" style="margin-bottom:12px">Clear a level to unlock the next one.</p>
+        <div class="levels" id="levelGrid"></div>
+        <div class="row">
+          <button class="btn ghost small" id="btnLevelsBack">Change balloon</button>
+          <button class="btn ghost small" id="btnReset">Reset progress</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scBrief">
+      <div class="card">
+        <p id="briefNo" style="margin:0 0 2px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; font-size:11px; opacity:.5"></p>
+        <h2 id="briefName"></h2>
+        <p class="sub" id="briefSub" style="margin-bottom:14px"></p>
+        <div class="stat"><span>Target altitude</span><span id="briefAlt"></span></div>
+        <div class="stat"><span>Wind</span><span id="briefWind"></span></div>
+        <div class="stat"><span>Hazards</span><span id="briefHaz"></span></div>
+        <p class="hintline" id="briefHint"></p>
+        <div class="row">
+          <button class="btn ghost small" id="btnBriefBack">Back</button>
+          <button class="btn" id="btnBriefGo">Launch</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scPause">
+      <div class="card">
+        <h2>Paused</h2>
+        <p class="sub" id="pauseHint"></p>
+        <div class="row">
+          <button class="btn" id="btnResume">Resume</button>
+          <button class="btn ghost" id="btnQuit">Quit to levels</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scWin">
+      <div class="card">
+        <h2 id="winTitle">Altitude reached</h2>
+        <p class="sub" id="winSub"></p>
+        <div class="stat"><span>Altitude</span><span id="winAlt"></span></div>
+        <div class="stat"><span>Stickers left</span><span id="winStick"></span></div>
+        <div class="stat"><span>Slipstream bonus</span><span id="winBonus"></span></div>
+        <div class="stat"><span>Score</span><span id="winScore"></span></div>
+        <div class="stat"><span>Best</span><span id="winBest"></span></div>
+        <div class="row">
+          <button class="btn" id="btnNext">Next level</button>
+          <button class="btn ghost" id="btnWinLevels">Levels</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="scLose">
+      <div class="card">
+        <h2>Pop.</h2>
+        <p class="sub" id="loseSub"></p>
+        <div class="stat"><span>Altitude reached</span><span id="loseAlt"></span></div>
+        <div class="stat"><span>Score</span><span id="loseScore"></span></div>
+        <p class="hintline" id="loseHint"></p>
+        <div class="row">
+          <button class="btn" id="btnRetry">Try again</button>
+          <button class="btn ghost" id="btnLoseLevels">Levels</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+
+/* ==========================================================================
+   Skyward - core: constants, helpers, audio, save data, balloon catalog
+   ========================================================================== */
+'use strict';
+
+const W = 800, H = 600;                  // SVG world units
+const NS = 'http://www.w3.org/2000/svg';
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+const $ = id => document.getElementById(id);
+
+function el(tag, attrs, parent) {
+  const n = document.createElementNS(NS, tag);
+  if (attrs) for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+/* Build an SVG fragment from markup, returned as a <g> */
+function gfx(markup, cls) {
+  const g = document.createElementNS(NS, 'g');
+  if (cls) g.setAttribute('class', cls);
+  g.innerHTML = markup;
+  return g;
+}
+
+/* ---------------------------------------------------------------- audio --
+   Everything is synthesised, so the page stays a single file.            */
+const Sound = {
+  ctx: null, on: true, master: null, windGain: null, windSrc: null,
+  init() {
+    if (this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { this.on = false; return; }
+    this.ctx = new AC();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0.5;
+    this.master.connect(this.ctx.destination);
+  },
+  resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+  noiseBuffer(sec) {
+    const n = (this.ctx.sampleRate * sec) | 0;
+    const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  },
+  tone(freq, dur, type, vol, slideTo) {
+    if (!this.on || !this.ctx) return;
+    const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.25, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t); o.stop(t + dur + 0.05);
+  },
+  burst(dur, vol, filterFreq, sweepTo) {
+    if (!this.on || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuffer(dur + 0.05);
+    const f = this.ctx.createBiquadFilter(); f.type = 'bandpass';
+    f.frequency.setValueAtTime(filterFreq, t);
+    if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+    f.Q.value = 0.9;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(this.master);
+    s.start(t); s.stop(t + dur + 0.05);
+  },
+  ui()      { this.tone(560, 0.07, 'triangle', 0.13); },
+  pickup()  { this.tone(760, 0.09, 'triangle', 0.2); setTimeout(() => this.tone(1180, 0.13, 'triangle', 0.17), 70); },
+  prick()   { this.tone(320, 0.1, 'square', 0.16, 120); this.burst(0.12, 0.16, 2400, 700); },
+  pop()     {
+    this.burst(0.28, 0.6, 1600, 180);
+    this.tone(180, 0.22, 'sawtooth', 0.28, 40);
+  },
+  thunder() { this.burst(1.1, 0.42, 320, 60); this.tone(58, 0.9, 'sine', 0.22, 30); },
+  zap()     { this.burst(0.18, 0.3, 5200, 1400); this.tone(1400, 0.1, 'square', 0.1, 300); },
+  whoosh()  { this.burst(0.35, 0.16, 700, 2600); },
+  win()     { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.tone(f, 0.24, 'triangle', 0.2), i * 110)); },
+  lose()    { [440, 349, 262].forEach((f, i) => setTimeout(() => this.tone(f, 0.35, 'sine', 0.2), i * 150)); },
+  windStart(level) {
+    if (!this.on || !this.ctx || this.windSrc) return;
+    const s = this.ctx.createBufferSource();
+    s.buffer = this.noiseBuffer(2); s.loop = true;
+    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420;
+    const g = this.ctx.createGain(); g.gain.value = 0;
+    s.connect(f); f.connect(g); g.connect(this.master);
+    s.start();
+    this.windSrc = s; this.windGain = g;
+    this.windSet(level);
+  },
+  windSet(v) { if (this.windGain) this.windGain.gain.value = clamp(v, 0, 1) * 0.09; },
+  windStop() { if (this.windSrc) { try { this.windSrc.stop(); } catch (e) {} this.windSrc = null; this.windGain = null; } },
+  toggle() {
+    this.on = !this.on;
+    if (this.master) this.master.gain.value = this.on ? 0.5 : 0;
+    return this.on;
+  }
+};
+
+/* ----------------------------------------------------------------- save -- */
+const Save = {
+  key: 'skyward.save.v1',
+  data: { unlocked: 1, best: {}, colour: 'crimson', type: 'classic', sound: true },
+  load() {
+    try {
+      const raw = localStorage.getItem(this.key);
+      if (raw) Object.assign(this.data, JSON.parse(raw));
+    } catch (e) { /* private mode, run with defaults */ }
+    return this.data;
+  },
+  write() { try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) {} },
+  unlock(n) { if (n > this.data.unlocked) { this.data.unlocked = n; this.write(); } },
+  setBest(id, score) {
+    const cur = this.data.best[id] || 0;
+    if (score > cur) { this.data.best[id] = score; this.write(); return true; }
+    return false;
+  },
+  reset() { this.data.unlocked = 1; this.data.best = {}; this.write(); }
+};
+
+/* -------------------------------------------------------- balloon kit ---- */
+const COLOURS = [
+  { id: 'crimson', name: 'Crimson',   hi: '#ff9aa6', mid: '#e6394a', lo: '#9d1226' },
+  { id: 'mango',   name: 'Mango',     hi: '#ffd79a', mid: '#ff9a2e', lo: '#c25a06' },
+  { id: 'lagoon',  name: 'Lagoon',    hi: '#a9ecff', mid: '#22b8e6', lo: '#0a6d90' },
+  { id: 'meadow',  name: 'Meadow',    hi: '#bdf3b6', mid: '#46bf5e', lo: '#177033' },
+  { id: 'orchid',  name: 'Orchid',    hi: '#e9bdff', mid: '#a552d8', lo: '#5c1c85' },
+  { id: 'sunbeam', name: 'Sunbeam',   hi: '#fff3ab', mid: '#f5cf2e', lo: '#a8860a' },
+  { id: 'ink',     name: 'Ink',       hi: '#9fb2d6', mid: '#3d4f78', lo: '#1a2440' },
+  { id: 'bubble',  name: 'Bubblegum', hi: '#ffd0e6', mid: '#ff77b4', lo: '#b52d6d' }
+];
+
+const TYPES = [
+  { id: 'classic',  name: 'Classic',  r: 27, accel: 1.00, drag: 3.0, top: 1.00, stickers: 0,
+    desc: 'The honest party balloon. Balanced handling, nothing clever.' },
+  { id: 'teardrop', name: 'Teardrop', r: 24, accel: 1.22, drag: 2.6, top: 1.16, stickers: 0,
+    desc: 'Slim and quick. Smaller target, but it slides past where you meant to stop.' },
+  { id: 'heart',    name: 'Heart',    r: 28, accel: 0.92, drag: 3.6, top: 0.94, stickers: 1,
+    desc: 'Wide and sentimental. Starts with one extra sticker, turns like a bus.' },
+  { id: 'blimp',    name: 'Blimp',    r: 30, accel: 0.86, drag: 4.4, top: 1.06, stickers: 0,
+    desc: 'Long body, strong glide. Hard to start, harder to stop, punishes hesitation.' }
+];
+
+const colourOf = id => COLOURS.find(c => c.id === id) || COLOURS[0];
+const typeOf = id => TYPES.find(t => t.id === id) || TYPES[0];
+
+/* Gradient defs are created once per colour and reused by every balloon SVG */
+function ensureBalloonGradients() {
+  const defs = $('defs');
+  COLOURS.forEach(c => {
+    if ($('bg-' + c.id)) return;
+    const rg = el('radialGradient', { id: 'bg-' + c.id, cx: '35%', cy: '30%', r: '78%' }, defs);
+    el('stop', { offset: '0%', 'stop-color': c.hi }, rg);
+    el('stop', { offset: '55%', 'stop-color': c.mid }, rg);
+    el('stop', { offset: '100%', 'stop-color': c.lo }, rg);
+  });
+  if (!$('shine')) {
+    const lg = el('linearGradient', { id: 'shine', x1: '0', y1: '0', x2: '0', y2: '1' }, defs);
+    el('stop', { offset: '0%', 'stop-color': '#fff', 'stop-opacity': '.75' }, lg);
+    el('stop', { offset: '100%', 'stop-color': '#fff', 'stop-opacity': '0' }, lg);
+  }
+}
+
+/* Balloon body path per type, drawn around origin (0,0) at the knot */
+function balloonBody(typeId) {
+  switch (typeId) {
+    case 'teardrop':
+      return 'M0,0 C-30,-26 -30,-64 0,-84 C30,-64 30,-26 0,0 Z';
+    case 'heart':
+      return 'M0,0 C-8,-14 -40,-26 -40,-52 C-40,-72 -18,-80 0,-62 C18,-80 40,-72 40,-52 C40,-26 8,-14 0,0 Z';
+    case 'blimp':
+      return 'M0,0 C-26,-10 -42,-30 -42,-52 C-42,-76 -22,-92 0,-92 C22,-92 42,-76 42,-52 C42,-30 26,-10 0,0 Z';
+    default:
+      return 'M0,0 C-12,-10 -36,-24 -36,-52 C-36,-76 -18,-90 0,-90 C18,-90 36,-76 36,-52 C36,-24 12,-10 0,0 Z';
+  }
+}
+
+/* One balloon, as SVG markup. Used by the picker, the title card and the game. */
+function balloonMarkup(typeId, colourId, opts) {
+  const o = opts || {};
+  const c = colourOf(colourId);
+  const body = balloonBody(typeId);
+  const scale = o.scale || 1;
+  const patches = o.patches || 0;
+  const patchDots = ['-18,-58', '14,-44', '-6,-72', '20,-64', '-24,-38'];
+  let p = '';
+  for (let i = 0; i < patches; i++) {
+    const [px, py] = patchDots[i % patchDots.length].split(',');
+    p += '<g transform="translate(' + px + ',' + py + ') rotate(' + (i * 37) + ')">' +
+         '<circle r="7.5" fill="#fff" opacity=".95"/>' +
+         '<circle r="5" fill="' + (o.patchColour || '#ffc94d') + '"/>' +
+         '<path d="M-2.4,0 L2.4,0 M0,-2.4 L0,2.4" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></g>';
+  }
+  return '<g transform="scale(' + scale + ')">' +
+    '<path d="' + body + '" fill="url(#bg-' + c.id + ')" stroke="' + c.lo + '" stroke-width="2" stroke-opacity=".35"/>' +
+    '<ellipse cx="-12" cy="-62" rx="9" ry="15" fill="url(#shine)" transform="rotate(-18 -12 -62)"/>' +
+    p +
+    '<path d="M-5,-2 L5,-2 L2.5,6 L-2.5,6 Z" fill="' + c.lo + '"/>' +
+    '<path d="M0,6 C6,14 -6,22 0,30 C5,36 -3,42 0,48" fill="none" stroke="' + (o.string || '#6b7a92') +
+      '" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>' +
+    '</g>';
+}
+
+/* ==========================================================================
+   Skyward - sprite registry
+   Every hazard, pickup and zone is defined here as pure SVG markup plus the
+   handful of numbers the simulation needs. A level JSON only ever refers to
+   a sprite by name, so adding a hazard means adding one entry below.
+
+   kind:   'hazard' (pops you) | 'soft' (shoves you) | 'zone' | 'pickup' |
+           'decor' | 'barrier' | 'bolt'
+   r:      collision radius in world units (barriers and bolts use bands)
+   ========================================================================== */
+
+const SPRITES = {
+
+  /* ------------------------------------------------------------- birds -- */
+  bird: {
+    kind: 'hazard', r: 15, spin: false,
+    make: () => '<g class="flap">' +
+      '<path d="M-19,0 C-12,-11 -5,-11 0,-2 C5,-11 12,-11 19,0 C11,-3 5,-1 0,4 C-5,-1 -11,-3 -19,0 Z" fill="#3b4a63"/>' +
+      '<ellipse cx="0" cy="2" rx="7" ry="5.5" fill="#4f6383"/>' +
+      '<circle cx="3" cy="0.5" r="1.4" fill="#fff"/>' +
+      '<path d="M7,2 L14,4 L7,5.5 Z" fill="#ffb03a"/></g>'
+  },
+
+  /* -------------------------------------------------------------- soft -- */
+  leaf: {
+    kind: 'soft', r: 13,
+    make: () => {
+      const c = pick(['#d9622b', '#e39a2b', '#b8452a', '#8a9c2f', '#c9762a']);
+      return '<path d="M0,-13 C11,-7 12,7 0,14 C-12,7 -11,-7 0,-13 Z" fill="' + c + '"/>' +
+             '<path d="M0,-11 L0,12" stroke="rgba(0,0,0,.25)" stroke-width="1.2"/>';
+    }
+  },
+  cloud: {
+    kind: 'decor', r: 46,
+    make: () => '<g opacity=".8"><ellipse cx="-22" cy="4" rx="24" ry="16" fill="#fff"/>' +
+      '<ellipse cx="4" cy="-6" rx="30" ry="21" fill="#fff"/>' +
+      '<ellipse cx="28" cy="6" rx="22" ry="14" fill="#fff"/></g>'
+  },
+
+  /* ------------------------------------------------------------ sharps -- */
+  twig: {
+    kind: 'hazard', r: 16,
+    make: () => '<g><path d="M-20,-6 L20,6" stroke="#6b4a2b" stroke-width="5" stroke-linecap="round"/>' +
+      '<path d="M-4,0 L-12,-12 M6,2 L14,-9" stroke="#6b4a2b" stroke-width="3.5" stroke-linecap="round"/>' +
+      '<path d="M20,6 L27,9" stroke="#8a6134" stroke-width="3" stroke-linecap="round"/></g>'
+  },
+  kite: {
+    kind: 'hazard', r: 20, spin: false,
+    make: () => {
+      const c = pick(['#ff5d7a', '#3fb8ff', '#ffc94d', '#7ed957', '#c07dff']);
+      return '<g><path d="M0,-22 L16,0 L0,22 L-16,0 Z" fill="' + c + '" stroke="rgba(0,0,0,.25)" stroke-width="1.5"/>' +
+        '<path d="M0,-22 L0,22 M-16,0 L16,0" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/>' +
+        '<path d="M0,22 C6,30 -6,38 0,46" fill="none" stroke="#e8eef7" stroke-width="1.4"/>' +
+        '<path d="M-4,28 L4,32 M-4,38 L4,42" stroke="' + c + '" stroke-width="2.5"/></g>';
+    }
+  },
+  hail: {
+    kind: 'hazard', r: 11,
+    make: () => '<g><path d="M0,-11 L9,-5 L9,6 L0,11 L-9,6 L-9,-5 Z" fill="#dff0ff" stroke="#9dc4de" stroke-width="1.4"/>' +
+      '<path d="M-4,-5 L2,-1 L-2,4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></g>'
+  },
+  icicle: {
+    kind: 'hazard', r: 12, spin: false,
+    make: () => '<g><path d="M-8,-18 L8,-18 L0,26 Z" fill="#cfe9fb" stroke="#8fc0dd" stroke-width="1.3"/>' +
+      '<path d="M-3,-14 L-1,14" stroke="#fff" stroke-width="2" opacity=".8" stroke-linecap="round"/></g>'
+  },
+  burr: {
+    kind: 'hazard', r: 14,
+    make: () => {
+      let sp = '';
+      for (let i = 0; i < 12; i++) {
+        const a = i * 30 * Math.PI / 180;
+        sp += '<path d="M' + (Math.cos(a) * 5).toFixed(1) + ',' + (Math.sin(a) * 5).toFixed(1) +
+              ' L' + (Math.cos(a) * 15).toFixed(1) + ',' + (Math.sin(a) * 15).toFixed(1) +
+              '" stroke="#4d7c3a" stroke-width="2.4" stroke-linecap="round"/>';
+      }
+      return '<g>' + sp + '<circle r="7" fill="#7fb069" stroke="#3f6b30" stroke-width="1.5"/></g>';
+    }
+  },
+  spark: {
+    kind: 'hazard', r: 10,
+    make: () => '<g><circle r="6" fill="#ffe680"/><circle r="10" fill="#ffb02e" opacity=".35"/>' +
+      '<path d="M0,-14 L0,14 M-14,0 L14,0" stroke="#fff2b0" stroke-width="1.6" opacity=".8"/></g>'
+  },
+  meteor: {
+    kind: 'hazard', r: 14, spin: false,
+    make: () => '<g><path d="M-2,-4 L-46,-26 L-6,4 Z" fill="#ff8a3d" opacity=".55"/>' +
+      '<path d="M-2,2 L-38,-4 L-4,8 Z" fill="#ffd36e" opacity=".5"/>' +
+      '<circle r="10" fill="#6b4a3a"/><circle cx="-3" cy="-3" r="3" fill="#8d6552"/>' +
+      '<circle r="13" fill="#ff7a2f" opacity=".3"/></g>'
+  },
+  shard: {
+    kind: 'hazard', r: 13,
+    make: () => '<g><path d="M0,-16 L11,-2 L4,16 L-8,10 L-11,-4 Z" fill="#bfe6ff" opacity=".92" ' +
+      'stroke="#7fb6d8" stroke-width="1.3"/>' +
+      '<path d="M0,-13 L2,12" stroke="#fff" stroke-width="1.6" opacity=".7"/></g>'
+  },
+  drone: {
+    kind: 'hazard', r: 22, tracks: true, spin: false,
+    make: () => '<g><rect x="-13" y="-7" width="26" height="14" rx="5" fill="#3b4657" stroke="#222b38" stroke-width="1.5"/>' +
+      '<circle cx="0" cy="0" r="3.4" fill="#ff4757"/>' +
+      '<rect x="-26" y="-11" width="12" height="3" rx="1.5" fill="#2a3341"/>' +
+      '<rect x="14" y="-11" width="12" height="3" rx="1.5" fill="#2a3341"/>' +
+      '<g class="spin1"><ellipse cx="-20" cy="-12" rx="13" ry="2.4" fill="#8fa3bd" opacity=".75"/></g>' +
+      '<g class="spin2"><ellipse cx="20" cy="-12" rx="13" ry="2.4" fill="#8fa3bd" opacity=".75"/></g></g>'
+  },
+  orb: {
+    kind: 'hazard', r: 17, tracks: true, spin: false,
+    make: () => '<g><circle r="16" fill="#7cf3ff" opacity=".18"/>' +
+      '<circle r="10" fill="#39d7ff" opacity=".45"/><circle r="5" fill="#eaffff"/>' +
+      '<path d="M-16,0 A16,16 0 0 1 16,0" fill="none" stroke="#9ff6ff" stroke-width="1.4" opacity=".8"/>' +
+      '<path d="M0,-16 A16,16 0 0 1 0,16" fill="none" stroke="#9ff6ff" stroke-width="1.4" opacity=".8"/></g>'
+  },
+
+  /* ------------------------------------------------------------ pickup -- */
+  sticker: {
+    kind: 'pickup', r: 18, spin: false,
+    make: () => '<g class="bob"><circle r="16" fill="#fff"/>' +
+      '<circle r="12.5" fill="#ffc94d"/>' +
+      '<path d="M-5,0 L5,0 M0,-5 L0,5" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>' +
+      '<circle r="16" fill="none" stroke="#ffb01f" stroke-width="1.6" stroke-dasharray="3 3"/></g>'
+  },
+
+  /* ------------------------------------------------------------- zones -- */
+  gust: {
+    kind: 'zone', r: 0, h: 120,
+    make: (p) => {
+      const dir = p.dir || 1;
+      let s = '<g opacity=".5">';
+      for (let i = 0; i < 5; i++) {
+        const y = -50 + i * 25, w = 120 + i * 40;
+        s += '<path d="M' + (-w / 2) + ',' + y + ' q' + (w / 2) + ',' + (-10 * dir) + ' ' + w + ',0" ' +
+             'fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" opacity="' + (0.35 + i * 0.1) + '"/>';
+      }
+      const ax = dir > 0 ? 1 : -1;
+      s += '<path d="M' + (160 * ax) + ',10 l' + (-18 * ax) + ',-9 l0,18 Z" fill="#fff" opacity=".7"/></g>';
+      return s;
+    }
+  },
+  updraft: {
+    kind: 'zone', r: 0, h: 150, lift: true,
+    make: () => {
+      let s = '<g opacity=".55">';
+      for (let i = 0; i < 4; i++) {
+        const x = -45 + i * 30;
+        s += '<path d="M' + x + ',70 q10,-40 0,-80 q-10,-40 0,-60" fill="none" stroke="#b6f5c0" ' +
+             'stroke-width="3" stroke-linecap="round" opacity="' + (0.45 + i * 0.12) + '"/>';
+      }
+      s += '<path d="M0,-96 l-13,20 l26,0 Z" fill="#d6ffdd" opacity=".8"/></g>';
+      return s;
+    }
+  },
+
+  /* ---------------------------------------------------------- barriers --
+     One horizontal band with a single gap. This is the core skill test:
+     read the gap, cross the screen, get through before the band arrives.  */
+  barrier: {
+    kind: 'barrier', h: 34,
+    make: (p) => {
+      const gap = p.gap, gx = p.gapX, style = p.style || 'hedge';
+      const segs = [[0, gx - gap / 2], [gx + gap / 2, W]];
+      let s = '';
+      segs.forEach(([a, b]) => {
+        const w = b - a;
+        if (w <= 2) return;
+        if (style === 'hedge') {
+          let spikes = '';
+          for (let x = a + 8; x < b - 4; x += 16)
+            spikes += '<path d="M' + x + ',6 l7,-20 l7,20 Z" fill="#3f7a3a"/>';
+          s += '<rect x="' + a + '" y="0" width="' + w + '" height="26" rx="7" fill="#4f9147"/>' + spikes +
+               '<rect x="' + a + '" y="14" width="' + w + '" height="12" rx="5" fill="#3d7538" opacity=".7"/>';
+        } else if (style === 'string') {
+          let barbs = '';
+          for (let x = a + 10; x < b - 4; x += 22)
+            barbs += '<path d="M' + x + ',2 l6,-8 M' + x + ',2 l6,8" stroke="#c9d6e8" stroke-width="2"/>';
+          s += '<path d="M' + a + ',4 L' + b + ',4" stroke="#e8eef7" stroke-width="3.4"/>' + barbs +
+               '<path d="M' + a + ',4 L' + b + ',4" stroke="#9fb2d6" stroke-width="1" stroke-dasharray="6 6"/>';
+        } else if (style === 'hail') {
+          let stones = '';
+          for (let x = a + 10; x < b - 4; x += 20)
+            stones += '<path d="M' + x + ',-8 l8,5 l0,10 l-8,5 l-8,-5 l0,-10 Z" fill="#dff0ff" stroke="#9dc4de" stroke-width="1.2"/>';
+          s += '<rect x="' + a + '" y="-6" width="' + w + '" height="18" rx="8" fill="#cfe4f5" opacity=".55"/>' + stones;
+        } else if (style === 'ice') {
+          let spears = '';
+          for (let x = a + 8; x < b - 4; x += 18)
+            spears += '<path d="M' + x + ',-6 l9,0 l-4.5,24 Z" fill="#cfe9fb" stroke="#8fc0dd" stroke-width="1.1"/>';
+          s += '<rect x="' + a + '" y="-14" width="' + w + '" height="14" rx="5" fill="#a9d4ee"/>' + spears;
+        } else if (style === 'thorn') {
+          let barbs = '';
+          for (let x = a + 6; x < b - 4; x += 14)
+            barbs += '<path d="M' + x + ',4 l5,-16 l5,16 Z" fill="#6f9c4b"/>' +
+                     '<path d="M' + (x + 3) + ',10 l4,12 l-8,0 Z" fill="#4d7c3a"/>';
+          s += '<rect x="' + a + '" y="0" width="' + w + '" height="12" rx="6" fill="#7a5a34"/>' + barbs +
+               '<rect x="' + a + '" y="4" width="' + w + '" height="6" rx="3" fill="#63482a" opacity=".8"/>';
+        } else { /* laser */
+          s += '<rect x="' + a + '" y="-3" width="' + w + '" height="6" rx="3" fill="#ff4d6d" opacity=".95"/>' +
+               '<rect x="' + a + '" y="-9" width="' + w + '" height="18" rx="9" fill="#ff4d6d" opacity=".22"/>' +
+               '<rect x="' + a + '" y="-1.2" width="' + w + '" height="2.4" fill="#fff" opacity=".85"/>';
+        }
+      });
+      /* gap markers so the eye finds the opening early */
+      s += '<g opacity=".85"><path d="M' + (gx - gap / 2 + 4) + ',-16 l0,32" stroke="#ffffff" stroke-width="2" stroke-dasharray="4 5"/>' +
+           '<path d="M' + (gx + gap / 2 - 4) + ',-16 l0,32" stroke="#ffffff" stroke-width="2" stroke-dasharray="4 5"/></g>';
+      return s;
+    }
+  },
+
+  /* ------------------------------------------------------------- bolt --
+     Telegraphed lightning: a warning column, then a lethal strike.       */
+  bolt: {
+    kind: 'bolt',
+    make: (p) => {
+      const w = p.width || 30;
+      let path = 'M0,0';
+      let x = 0;
+      for (let y = 40; y <= H + 40; y += 46) {
+        x = rand(-w * 0.5, w * 0.5);
+        path += ' L' + x.toFixed(1) + ',' + y;
+      }
+      return '<g class="warn"><rect x="' + (-w / 2) + '" y="0" width="' + w + '" height="' + (H + 60) + '" ' +
+        'fill="#ffffff" opacity=".22"/>' +
+        '<rect x="' + (-w / 2 - 3) + '" y="0" width="' + (w + 6) + '" height="' + (H + 60) + '" fill="none" ' +
+        'stroke="#fff" stroke-width="1.5" stroke-dasharray="8 8" opacity=".7"/></g>' +
+        '<g class="strike" style="display:none">' +
+        '<path d="' + path + '" fill="none" stroke="#fff8c9" stroke-width="' + (w * 0.55) + '" ' +
+        'stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>' +
+        '<path d="' + path + '" fill="none" stroke="#ffffff" stroke-width="5" ' +
+        'stroke-linecap="round" stroke-linejoin="round"/></g>';
+    }
+  }
+};
+
+/* Human-readable hazard names for the level briefing */
+const SPRITE_LABEL = {
+  bird: 'birds', leaf: 'leaves', twig: 'twigs', kite: 'kites', hail: 'hail',
+  icicle: 'icicles', burr: 'burrs', spark: 'sparks', meteor: 'meteors',
+  shard: 'ice shards', drone: 'drones', orb: 'static orbs', bolt: 'lightning',
+  gust: 'gusts', updraft: 'updrafts', barrier: 'walls', sticker: 'stickers', cloud: 'cloud'
+};
+
+/* ==========================================================================
+   Skyward - simulation
+   ========================================================================== */
+
+const HOME_Y = 400;            // where the balloon rests vertically
+const Y_MIN = 150, Y_MAX = 520;
+
+const Game = {
+  level: null, running: false, over: false,
+  t: 0, alt: 0, score: 0, slip: 0, stickers: 3, maxStickers: 5,
+  invuln: 0, wind: 0, shakeT: 0,
+  ents: [], parts: [], bands: [],
+  player: null, playerEl: null, spawners: [],
+
+  /* ------------------------------------------------------------- start -- */
+  start(level) {
+    this.level = level;
+    this.t = 0; this.alt = 0; this.score = 0; this.slip = 0;
+    this.over = false; this.running = true; this.invuln = 0; this.wind = 0;
+    const ty = typeOf(Save.data.type);
+    this.maxStickers = 5;
+    this.stickers = clamp((level.startStickers || 3) + (ty.stickers || 0), 1, this.maxStickers);
+    this.initialStickers = this.stickers;
+
+    this.ents.length = 0; this.parts.length = 0; this.bands.length = 0;
+    ['lBg', 'lParts', 'lWorld', 'lPlayer', 'lFx'].forEach(id => { $(id).innerHTML = ''; });
+
+    this.buildBackground(level.theme);
+    this.buildParticles(level.theme);
+    this.buildPlayer();
+
+    this.spawners = (level.spawners || []).map(s => ({
+      def: s,
+      next: rand(0.4, 1.4) + (s.delay || 0),
+      from: s.from == null ? 0 : s.from,
+      to: s.to == null ? 1 : s.to
+    }));
+
+    Sound.init(); Sound.resume();
+    Sound.windStart(0.2);
+    UI.hudOn(true);
+    UI.syncHud();
+  },
+
+  stop() {
+    this.running = false;
+    Sound.windStop();
+  },
+
+  /* -------------------------------------------------------- background -- */
+  buildBackground(th) {
+    const bg = $('lBg'), defs = $('defs');
+    const old = $('skyGrad'); if (old) old.remove();
+    const lg = el('linearGradient', { id: 'skyGrad', x1: '0', y1: '0', x2: '0', y2: '1' }, defs);
+    el('stop', { offset: '0%', 'stop-color': th.sky[0] }, lg);
+    el('stop', { offset: '100%', 'stop-color': th.sky[1] }, lg);
+
+    el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#skyGrad)' }, bg);
+
+    if (th.sun) {
+      const sx = 640, sy = 120;
+      bg.appendChild(gfx('<g><circle cx="' + sx + '" cy="' + sy + '" r="86" fill="#fff6c9" opacity=".28"/>' +
+        '<circle cx="' + sx + '" cy="' + sy + '" r="44" fill="#fff3ad" opacity=".85"/></g>'));
+    } else if (th.light === 'night') {
+      bg.appendChild(gfx('<g><circle cx="150" cy="110" r="46" fill="#e9f1ff" opacity=".9"/>' +
+        '<circle cx="132" cy="98" r="40" fill="' + th.sky[0] + '" opacity=".9"/></g>'));
+    }
+
+    /* parallax cloud bands */
+    const n = th.cloudBands || 3;
+    const bandLayer = el('g', { id: 'bands', opacity: th.light === 'storm' ? '.55' : '.75' }, bg);
+    for (let i = 0; i < n; i++) {
+      const depth = 0.18 + (i / n) * 0.5;
+      const tone = th.light === 'storm' ? '#5c6d84' : th.light === 'night' ? '#2b3557' : '#ffffff';
+      const g = gfx('<g opacity="' + (0.28 + depth * 0.5) + '">' +
+        '<ellipse cx="-70" cy="0" rx="' + (70 + i * 18) + '" ry="' + (22 + i * 6) + '" fill="' + tone + '"/>' +
+        '<ellipse cx="10" cy="-12" rx="' + (95 + i * 20) + '" ry="' + (30 + i * 8) + '" fill="' + tone + '"/>' +
+        '<ellipse cx="90" cy="2" rx="' + (66 + i * 16) + '" ry="' + (20 + i * 5) + '" fill="' + tone + '"/></g>');
+      bandLayer.appendChild(g);
+      this.bands.push({ el: g, x: rand(0, W), y: rand(-200, H), sp: 12 + depth * 34, sc: 0.7 + depth });
+    }
+
+    /* storm flash plate */
+    if (th.flash) {
+      const f = el('rect', { id: 'flashPlate', x: 0, y: 0, width: W, height: H, fill: '#fff', opacity: 0 }, $('lFx'));
+      this.flashPlate = f;
+    } else this.flashPlate = null;
+  },
+
+  buildParticles(th) {
+    const kind = th.particles || 'none';
+    if (kind === 'none') return;
+    const layer = $('lParts');
+    const count = { rain: 90, snow: 70, leaves: 26, pollen: 44, dust: 40, stars: 60 }[kind] || 40;
+    for (let i = 0; i < count; i++) {
+      let m;
+      if (kind === 'rain') m = '<path d="M0,0 l-2,14" stroke="#cfe6f7" stroke-width="1.6" opacity=".7"/>';
+      else if (kind === 'snow') m = '<circle r="' + rand(1.2, 2.6).toFixed(1) + '" fill="#fff" opacity=".85"/>';
+      else if (kind === 'leaves') m = '<path d="M0,-5 C5,-2 5,3 0,6 C-5,3 -5,-2 0,-5 Z" fill="' +
+        pick(['#d9622b', '#e39a2b', '#9c8b2f']) + '" opacity=".8"/>';
+      else if (kind === 'pollen') m = '<circle r="' + rand(1, 2.4).toFixed(1) + '" fill="#fff6c9" opacity=".8"/>';
+      else if (kind === 'stars') m = '<circle r="' + rand(0.8, 1.9).toFixed(1) + '" fill="#fff" opacity="' + rand(.4, 1).toFixed(2) + '"/>';
+      else m = '<circle r="1.6" fill="#ffffff" opacity=".45"/>';
+      const e = gfx(m);
+      layer.appendChild(e);
+      this.parts.push({
+        el: e, x: rand(0, W), y: rand(0, H), kind,
+        sp: kind === 'rain' ? rand(430, 620) : kind === 'stars' ? rand(6, 18) : rand(40, 130),
+        dx: rand(-20, 20), ph: rand(0, 6.3)
+      });
+    }
+  },
+
+  buildPlayer() {
+    const ty = typeOf(Save.data.type);
+    const g = gfx(balloonMarkup(ty.id, Save.data.colour, { scale: 0.62 }));
+    $('lPlayer').appendChild(g);
+    this.playerEl = g;
+    this.player = {
+      x: W / 2, y: HOME_Y, vx: 0, vy: 0,
+      r: ty.r * 0.62 + 3, ty,
+      accel: 1750 * ty.accel, drag: ty.drag, top: 380 * ty.top
+    };
+    this.redrawPlayer();
+  },
+
+  /* Patches on the skin show how many pricks have already been survived. */
+  redrawPlayer() {
+    const ty = this.player.ty;
+    const patched = clamp((this.initialStickers || 0) - this.stickers, 0, 5);
+    this.playerEl.innerHTML = balloonMarkup(ty.id, Save.data.colour, { scale: 0.62, patches: patched });
+  },
+
+  /* --------------------------------------------------------------- tick -- */
+  tick(dt) {
+    if (!this.running) return;
+    const L = this.level, p = this.player;
+    this.t += dt;
+
+    /* wind */
+    const wnd = L.wind || { base: 0, gust: 0, period: 8 };
+    this.wind = (wnd.base || 0) + (wnd.gust || 0) * Math.sin(this.t * 2 * Math.PI / (wnd.period || 8));
+    Sound.windSet(0.15 + Math.abs(this.wind) / 220);
+
+    /* ---- input and horizontal movement (the skill) ---- */
+    let ax = Input.x * p.accel + this.wind * 2.2;
+    p.vx += ax * dt;
+    p.vx -= p.vx * p.drag * dt;
+    p.vx = clamp(p.vx, -p.top * 1.4, p.top * 1.4);
+    p.x += p.vx * dt;
+    if (p.x < p.r + 6) { p.x = p.r + 6; p.vx = Math.abs(p.vx) * 0.3; }
+    if (p.x > W - p.r - 6) { p.x = W - p.r - 6; p.vx = -Math.abs(p.vx) * 0.3; }
+
+    /* vertical nudge, springs back to the resting line */
+    p.vy += (Input.y * 520 - (p.y - HOME_Y) * 1.9) * dt;
+    p.vy -= p.vy * 3.4 * dt;
+    p.y = clamp(p.y + p.vy * dt, Y_MIN, Y_MAX);
+
+    /* ---- altitude, rewarded for lateral speed ---- */
+    const speedFrac = clamp(Math.abs(p.vx) / p.top, 0, 1.2);
+    const climb = L.climb * (1 + 0.5 * speedFrac);
+    this.alt += climb * dt;
+    if (speedFrac > 0.65) { this.slip += dt; this.score += 26 * dt; }
+    this.score += 9 * dt;
+
+    if (this.invuln > 0) this.invuln -= dt;
+
+    /* ---- spawning ---- */
+    const prog = clamp(this.alt / L.targetAltitude, 0, 1);
+    for (const sp of this.spawners) {
+      if (prog < sp.from || prog > sp.to) continue;
+      sp.next -= dt;
+      if (sp.next <= 0) {
+        const d = sp.def;
+        sp.next = (d.every || 2) + rand(-(d.jitter || 0), d.jitter || 0);
+        if (sp.next < 0.25) sp.next = 0.25;
+        const count = d.count || 1, spread = d.spread || 0;
+        const baseX = rand(70, W - 70);
+        for (let i = 0; i < count; i++) {
+          const off = count > 1 ? (i - (count - 1) / 2) * spread : 0;
+          this.spawn(d.sprite, d.props || {}, baseX + off);
+        }
+      }
+    }
+
+    this.updateBackground(dt);
+    this.updateEntities(dt);
+    this.updateParticles(dt);
+
+    /* ---- render player ---- */
+    const tilt = clamp(p.vx / p.top, -1, 1) * 22;
+    const blink = this.invuln > 0 && (Math.sin(this.t * 32) > 0);
+    this.playerEl.setAttribute('transform',
+      'translate(' + p.x.toFixed(1) + ',' + (p.y + 30).toFixed(1) + ') rotate(' + (-tilt).toFixed(1) + ')');
+    this.playerEl.setAttribute('opacity', blink ? 0.35 : 1);
+
+    UI.syncHud(prog, speedFrac);
+
+    if (this.alt >= L.targetAltitude) this.win();
+  },
+
+  updateBackground(dt) {
+    const scroll = this.level.scroll;
+    for (const b of this.bands) {
+      b.y += (b.sp + scroll * 0.28) * dt;
+      b.x += this.wind * 0.35 * dt;
+      if (b.y > H + 120) { b.y = -140; b.x = rand(-60, W + 60); }
+      if (b.x < -260) b.x = W + 200; if (b.x > W + 260) b.x = -200;
+      b.el.setAttribute('transform', 'translate(' + b.x.toFixed(1) + ',' + b.y.toFixed(1) + ') scale(' + b.sc.toFixed(2) + ')');
+    }
+  },
+
+  updateParticles(dt) {
+    for (const q of this.parts) {
+      if (q.kind === 'stars') {
+        q.y += (q.sp + this.level.scroll * 0.08) * dt;
+      } else {
+        q.y += (q.sp + this.level.scroll * 0.5) * dt;
+        q.x += (q.dx + this.wind * 1.5) * dt;
+        if (q.kind === 'leaves' || q.kind === 'pollen')
+          q.x += Math.sin(this.t * 2 + q.ph) * 18 * dt;
+      }
+      if (q.y > H + 20) { q.y = -20; q.x = rand(-40, W + 40); }
+      if (q.x < -40) q.x = W + 30; if (q.x > W + 40) q.x = -30;
+      q.el.setAttribute('transform', 'translate(' + q.x.toFixed(1) + ',' + q.y.toFixed(1) + ')');
+    }
+  },
+
+  /* -------------------------------------------------------------- spawn -- */
+  spawn(name, props, x) {
+    const def = SPRITES[name];
+    if (!def) return;
+    const p = Object.assign({}, props);
+    const e = {
+      name, def, kind: def.kind, t: 0,
+      x: x, baseX: x, y: -70, r: (def.r || 0) * (p.scale || 1),
+      speed: p.speed || 0, drift: p.drift || 0,
+      sway: p.sway || null, push: p.push || 0, lift: p.lift || 0,
+      chase: p.chase || 0, damage: p.damage == null ? 1 : p.damage,
+      h: def.h || 0, dead: false, phase: 'live', props: p
+    };
+
+    if (name === 'barrier') {
+      const gap = p.gap || 180;
+      e.gap = gap;
+      e.gapX = clamp(rand(gap / 2 + 30, W - gap / 2 - 30), gap / 2 + 20, W - gap / 2 - 20);
+      /* push the gap away from where the player currently is: that is the test */
+      if (Math.abs(e.gapX - this.player.x) < 190) {
+        e.gapX = this.player.x < W / 2
+          ? clamp(this.player.x + rand(240, 430), gap / 2 + 24, W - gap / 2 - 24)
+          : clamp(this.player.x - rand(240, 430), gap / 2 + 24, W - gap / 2 - 24);
+      }
+      e.x = 0; e.baseX = 0;
+      e.y = -50;
+      e.el = gfx(def.make({ gap: gap, gapX: e.gapX, style: p.style }));
+      e.warned = false;
+    } else if (name === 'bolt') {
+      e.x = clamp(rand(60, W - 60), 40, W - 40);
+      e.baseX = e.x; e.y = 0;
+      e.warn = p.warn || 1; e.strike = p.strike || 0.3;
+      e.el = gfx(def.make({ width: p.width || 30 }));
+      e.el.setAttribute('transform', 'translate(' + e.x.toFixed(1) + ',0)');
+      Sound.zap();
+    } else if (def.kind === 'zone') {
+      e.h = def.h;
+      e.dir = Math.random() < 0.5 ? -1 : 1;
+      e.el = gfx(def.make({ dir: e.dir }));
+      if (name === 'gust') Sound.whoosh();
+    } else {
+      e.el = gfx(def.make(p));
+      e.rot = rand(0, 360);
+      e.spin = rand(-90, 90);
+    }
+    e.el.setAttribute('class', (e.el.getAttribute('class') || '') + ' ent');
+    $('lWorld').appendChild(e.el);
+    this.ents.push(e);
+  },
+
+  /* ----------------------------------------------------------- entities -- */
+  updateEntities(dt) {
+    const L = this.level, p = this.player;
+    for (let i = this.ents.length - 1; i >= 0; i--) {
+      const e = this.ents[i];
+      e.t += dt;
+
+      if (e.kind === 'bolt') {
+        this.updateBolt(e, dt);
+        if (e.dead) { e.el.remove(); this.ents.splice(i, 1); }
+        continue;
+      }
+
+      /* vertical: world scroll plus the entity's own fall speed */
+      e.y += (L.scroll + e.speed) * dt;
+
+      if (e.kind === 'barrier') {
+        e.el.setAttribute('transform', 'translate(0,' + e.y.toFixed(1) + ')');
+        if (!e.warned && e.y > -20) { e.warned = true; }
+        this.hitBarrier(e);
+      } else {
+        e.baseX += (e.drift + this.wind * (e.kind === 'soft' ? 1.4 : 0.35)) * dt;
+        if (e.chase) {
+          const dir = Math.sign(p.x - e.baseX);
+          e.baseX += dir * e.chase * dt;
+        }
+        e.x = e.baseX + (e.sway ? e.sway.amp * Math.sin(e.t * e.sway.freq * 6.283) : 0);
+        let tr = 'translate(' + e.x.toFixed(1) + ',' + e.y.toFixed(1) + ')';
+        if (e.name === 'meteor') {
+          /* meteors point along their own travel */
+          tr += ' rotate(' + (Math.atan2(L.scroll + e.speed, e.drift) * 57.3).toFixed(1) + ')';
+        } else if (e.rot != null && e.def.spin !== false && e.kind !== 'zone' && e.kind !== 'decor') {
+          e.rot += e.spin * dt;
+          tr += ' rotate(' + e.rot.toFixed(1) + ')';
+        }
+        e.el.setAttribute('transform', tr);
+        this.hitEntity(e, dt);
+      }
+
+      if (e.y > H + 140 || e.dead) {
+        e.el.remove();
+        this.ents.splice(i, 1);
+        if (!e.dead && e.kind === 'hazard') this.score += 12;   /* dodged */
+      }
+    }
+  },
+
+  updateBolt(e, dt) {
+    if (e.phase === 'live') {
+      e.warn -= dt;
+      if (e.warn <= 0) {
+        e.phase = 'strike';
+        e.el.querySelector('.warn').style.display = 'none';
+        e.el.querySelector('.strike').style.display = '';
+        Sound.thunder();
+        this.flash(0.72);
+        this.shake();
+      }
+    } else if (e.phase === 'strike') {
+      e.strike -= dt;
+      const p = this.player;
+      const w = (e.props.width || 30) / 2 + p.r * 0.55;
+      if (Math.abs(p.x - e.x) < w) this.hurt('struck by lightning');
+      if (e.strike <= 0) e.dead = true;
+    }
+  },
+
+  hitBarrier(e) {
+    const p = this.player;
+    const half = (e.h || 30) / 2;
+    if (Math.abs(p.y - e.y) > half + p.r * 0.85) return;
+    const gs = e.gapX - e.gap / 2, ge = e.gapX + e.gap / 2;
+    const inside = (p.x - p.r * 0.7) > gs && (p.x + p.r * 0.7) < ge;
+    if (!inside) this.hurt('clipped a wall');
+    else if (!e.scored) { e.scored = true; this.score += 90; UI.toast('threaded it  +90'); }
+  },
+
+  hitEntity(e, dt) {
+    const p = this.player;
+    const dx = p.x - e.x, dy = p.y - e.y;
+
+    if (e.kind === 'zone') {
+      if (Math.abs(dy) < e.h / 2 + p.r) {
+        if (e.lift) {                       /* updraft: free altitude, gentle lift */
+          this.alt += e.lift * dt;
+          p.vy -= 150 * dt;
+          if (!e.scored) { e.scored = true; UI.toast('updraft'); }
+        } else {                            /* gust: shoves you sideways */
+          p.vx += e.dir * (e.push || 200) * dt;
+        }
+      }
+      return;
+    }
+    if (e.kind === 'decor') return;
+
+    const rr = e.r + p.r * 0.8;
+    if (dx * dx + dy * dy > rr * rr) return;
+
+    if (e.kind === 'pickup') {
+      e.dead = true;
+      if (this.stickers < this.maxStickers) {
+        this.stickers++;
+        UI.toast('sticker  +1');
+        this.redrawPlayer();
+      } else {
+        this.score += 150;
+        UI.toast('spare sticker  +150');
+      }
+      this.score += 60;
+      Sound.pickup();
+      UI.syncStickers();
+      return;
+    }
+    if (e.kind === 'soft') {                /* leaves shove, never puncture */
+      const d = Math.max(12, Math.hypot(dx, dy));
+      p.vx += (dx / d) * (e.push || 60) * dt * 3;
+      p.vy += (dy / d) * (e.push || 60) * dt;
+      return;
+    }
+    if (e.kind === 'hazard' && e.damage > 0) {
+      e.dead = true;
+      this.hurt('hit by ' + (SPRITE_LABEL[e.name] || e.name));
+    }
+  },
+
+  /* -------------------------------------------------------------- harm -- */
+  hurt(reason) {
+    if (this.invuln > 0 || this.over) return;
+    this.lastReason = reason;
+    if (this.stickers > 0) {
+      this.stickers--;
+      this.invuln = 1.5;
+      Sound.prick();
+      this.shake();
+      this.puff(this.player.x, this.player.y);
+      UI.toast('patched  -1 sticker');
+      this.redrawPlayer();
+      UI.syncStickers();
+    } else {
+      this.popBalloon();
+    }
+  },
+
+  popBalloon() {
+    this.over = true;
+    this.running = false;
+    Sound.pop();
+    this.shake();
+    const c = colourOf(Save.data.colour);
+    const p = this.player;
+    this.playerEl.setAttribute('opacity', 0);
+    const fx = $('lFx');
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * 6.283 + rand(-0.2, 0.2);
+      const dist = rand(60, 190);
+      const s = gfx('<path d="M0,0 q6,-9 13,-3 q-4,9 -13,3 Z" fill="' + (i % 2 ? c.mid : c.lo) + '"/>');
+      fx.appendChild(s);
+      s.setAttribute('transform', 'translate(' + p.x + ',' + p.y + ')');
+      const an = el('animateTransform', {
+        attributeName: 'transform', type: 'translate', dur: '0.75s', fill: 'freeze',
+        from: p.x + ',' + p.y,
+        to: (p.x + Math.cos(a) * dist).toFixed(0) + ',' + (p.y + Math.sin(a) * dist + 80).toFixed(0)
+      }, s);
+      el('animate', { attributeName: 'opacity', from: '1', to: '0', dur: '0.75s', fill: 'freeze' }, s);
+      if (an.beginElement) an.beginElement();
+    }
+    this.flash(0.35);
+    setTimeout(() => { Sound.lose(); UI.lose(); }, 780);
+  },
+
+  puff(x, y) {
+    const g = gfx('<circle r="4" fill="#fff" opacity=".9"/>');
+    g.setAttribute('transform', 'translate(' + x + ',' + y + ')');
+    $('lFx').appendChild(g);
+    const c = g.firstChild;
+    el('animate', { attributeName: 'r', from: '4', to: '38', dur: '.45s', fill: 'freeze' }, c);
+    el('animate', { attributeName: 'opacity', from: '.9', to: '0', dur: '.45s', fill: 'freeze' }, c);
+    setTimeout(() => g.remove(), 500);
+  },
+
+  flash(v) {
+    if (!this.flashPlate) {
+      this.flashPlate = el('rect', { x: 0, y: 0, width: W, height: H, fill: '#fff', opacity: 0 }, $('lFx'));
+    }
+    const f = this.flashPlate;
+    f.setAttribute('opacity', v);
+    const fade = () => {
+      let o = parseFloat(f.getAttribute('opacity'));
+      o -= 0.06;
+      f.setAttribute('opacity', Math.max(0, o));
+      if (o > 0) requestAnimationFrame(fade);
+    };
+    requestAnimationFrame(fade);
+  },
+
+  shake() {
+    const app = $('app');
+    app.classList.remove('shake');
+    void app.offsetWidth;
+    app.classList.add('shake');
+  },
+
+  /* --------------------------------------------------------------- win -- */
+  win() {
+    if (this.over) return;
+    this.over = true;
+    this.running = false;
+    Sound.windStop();
+    Sound.win();
+    const bonus = Math.round(this.slip * 55);
+    const stickBonus = this.stickers * 200;
+    this.score = Math.round(this.score + bonus + stickBonus);
+    UI.win(bonus, stickBonus);
+  }
+};
+
+/* ==========================================================================
+   Skyward - levels, screens, input, main loop
+   ========================================================================== */
+
+/* Levels are authored as one JSON file each under /levels. When the page is
+   served over http the files are fetched at run time (drop in a new JSON,
+   reload, it is in the game). Opened straight from disk, file:// blocks the
+   fetch, so the same JSON is also baked in below by tools/build.sh. */
+const EMBEDDED_LEVELS = [{   "id": 1,   "name": "First Light",   "subtitle": "Clear skies, gentle lift",   "hint": "Steer with the arrow keys (or A / D). Moving sideways fast makes you climb faster.",   "targetAltitude": 750,   "climb": 54,   "scroll": 85,   "startStickers": 3,   "wind": { "base": 0, "gust": 0, "period": 10 },   "theme": {     "sky": ["#6ec6f2", "#dff4ff"],     "light": "day",     "sun": true,     "particles": "none",     "cloudBands": 3,     "flash": false   },   "spawners": [     { "sprite": "bird", "every": 2.4, "jitter": 0.9, "props": { "speed": 26, "sway": { "amp": 30, "freq": 0.45 } } },     { "sprite": "cloud", "every": 3.2, "jitter": 1.6, "props": { "speed": -25 } },     { "sprite": "sticker", "every": 12, "jitter": 3 }   ] } ,{   "id": 2,   "name": "Morning Meadow",   "subtitle": "Something is drifting up with you",   "hint": "Hedgerows have exactly one gap. Commit early and cross the whole screen.",   "targetAltitude": 900,   "climb": 54,   "scroll": 95,   "startStickers": 3,   "wind": { "base": 8, "gust": 10, "period": 9 },   "theme": { "sky": ["#63bff0", "#e6f7e9"], "light": "day", "sun": true, "particles": "pollen", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "bird", "every": 2.6, "jitter": 0.8, "props": { "speed": 30, "drift": 26, "sway": { "amp": 24, "freq": 0.5 } } },     { "sprite": "leaf", "every": 1.1, "jitter": 0.5, "count": 2, "spread": 60, "props": { "speed": 18, "push": 55 } },     { "sprite": "barrier", "from": 0.25, "every": 7.5, "jitter": 1.2, "props": { "style": "hedge", "gap": 210 } },     { "sprite": "cloud", "every": 4, "jitter": 1.5, "props": { "speed": -25 } },     { "sprite": "sticker", "every": 11, "jitter": 3 }   ] } ,{   "id": 3,   "name": "Breezy Ridge",   "subtitle": "The air has opinions",   "hint": "Wind pushes constantly. Lean against it before you need to.",   "targetAltitude": 1000,   "climb": 55,   "scroll": 105,   "startStickers": 3,   "wind": { "base": 20, "gust": 70, "period": 7 },   "theme": { "sky": ["#57b6ea", "#dceffb"], "light": "day", "sun": true, "particles": "leaves", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "bird", "every": 2.3, "jitter": 0.7, "props": { "speed": 34, "drift": 40, "sway": { "amp": 26, "freq": 0.6 } } },     { "sprite": "leaf", "every": 0.8, "jitter": 0.4, "count": 3, "spread": 70, "props": { "speed": 22, "push": 70 } },     { "sprite": "twig", "from": 0.2, "every": 3.4, "jitter": 1, "props": { "speed": 55, "drift": 30 } },     { "sprite": "barrier", "from": 0.2, "every": 6.5, "jitter": 1, "props": { "style": "hedge", "gap": 190 } },     { "sprite": "sticker", "every": 11, "jitter": 3 }   ] } ,{   "id": 4,   "name": "Autumn Gale",   "subtitle": "A whole forest went up",   "hint": "Leaves shove you but never pop you. Twigs do. Ride the gust bands.",   "targetAltitude": 1150,   "climb": 56,   "scroll": 115,   "startStickers": 3,   "wind": { "base": -15, "gust": 105, "period": 5.5 },   "theme": { "sky": ["#e6a15c", "#ffe6c4"], "light": "dusk", "sun": true, "particles": "leaves", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "leaf", "every": 0.45, "jitter": 0.2, "count": 3, "spread": 90, "props": { "speed": 30, "push": 90 } },     { "sprite": "twig", "every": 2.1, "jitter": 0.7, "props": { "speed": 70, "drift": 45, "sway": { "amp": 20, "freq": 0.9 } } },     { "sprite": "bird", "every": 3.4, "jitter": 1, "props": { "speed": 40, "drift": 60 } },     { "sprite": "gust", "from": 0.15, "every": 5.5, "jitter": 1.2, "props": { "speed": 10, "push": 260 } },     { "sprite": "barrier", "from": 0.25, "every": 6, "jitter": 0.8, "props": { "style": "hedge", "gap": 180 } },     { "sprite": "sticker", "every": 10, "jitter": 2.5 }   ] } ,{   "id": 5,   "name": "Kite Festival",   "subtitle": "Beautiful. Also: glass-coated string.",   "hint": "Kite lines cut. The gap in a line is narrow, so build speed before you go.",   "targetAltitude": 1250,   "climb": 57,   "scroll": 125,   "startStickers": 3,   "wind": { "base": 25, "gust": 80, "period": 6.5 },   "theme": { "sky": ["#4fb0e8", "#ffeed6"], "light": "day", "sun": true, "particles": "pollen", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "kite", "every": 2.2, "jitter": 0.6, "props": { "speed": 45, "drift": 35, "sway": { "amp": 40, "freq": 0.7 } } },     { "sprite": "barrier", "from": 0.12, "every": 5.2, "jitter": 0.8, "props": { "style": "string", "gap": 165 } },     { "sprite": "bird", "every": 3, "jitter": 0.9, "props": { "speed": 44, "drift": -50 } },     { "sprite": "leaf", "every": 1.4, "jitter": 0.6, "count": 2, "spread": 70, "props": { "speed": 26, "push": 70 } },     { "sprite": "sticker", "every": 10, "jitter": 2.5 }   ] } ,{   "id": 6,   "name": "Thunderhead",   "subtitle": "The light goes green and the air goes still",   "hint": "A white column means a bolt is coming. Be anywhere else.",   "targetAltitude": 1350,   "climb": 57,   "scroll": 130,   "startStickers": 3,   "wind": { "base": -20, "gust": 90, "period": 6 },   "theme": { "sky": ["#4a5a72", "#93a8bd"], "light": "storm", "sun": false, "particles": "rain", "cloudBands": 5, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.7, "jitter": 0.3, "count": 2, "spread": 80, "props": { "speed": 105 } },     { "sprite": "bolt", "from": 0.15, "every": 5.5, "jitter": 1.4, "props": { "warn": 1.05, "strike": 0.3, "width": 30 } },     { "sprite": "gust", "every": 6, "jitter": 1.5, "props": { "speed": 15, "push": 240 } },     { "sprite": "barrier", "from": 0.3, "every": 6.5, "jitter": 1, "props": { "style": "hail", "gap": 175 } },     { "sprite": "sticker", "every": 9.5, "jitter": 2.5 }   ] } ,{   "id": 7,   "name": "Storm Front",   "subtitle": "Two bolts, and less warning",   "hint": "Bolts come in pairs now. Read both columns, then pick your lane.",   "targetAltitude": 1500,   "climb": 58,   "scroll": 145,   "startStickers": 3,   "wind": { "base": 0, "gust": 135, "period": 4.5 },   "theme": { "sky": ["#2f3b52", "#6d7f97"], "light": "storm", "sun": false, "particles": "rain", "cloudBands": 5, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.5, "jitter": 0.2, "count": 2, "spread": 90, "props": { "speed": 125 } },     { "sprite": "bolt", "every": 3.6, "jitter": 0.8, "count": 2, "spread": 260, "props": { "warn": 0.9, "strike": 0.3, "width": 30 } },     { "sprite": "gust", "every": 4.5, "jitter": 1, "props": { "speed": 20, "push": 300 } },     { "sprite": "barrier", "from": 0.15, "every": 5.5, "jitter": 0.8, "props": { "style": "hail", "gap": 165 } },     { "sprite": "sticker", "every": 9, "jitter": 2 }   ] } ,{   "id": 8,   "name": "Hail Alley",   "subtitle": "Ice with corners",   "hint": "Icicles fall fast and straight. Keep moving, because a still balloon is a target.",   "targetAltitude": 1600,   "climb": 58,   "scroll": 155,   "startStickers": 3,   "wind": { "base": 30, "gust": 90, "period": 5 },   "theme": { "sky": ["#41566e", "#b9d6e8"], "light": "storm", "sun": false, "particles": "snow", "cloudBands": 4, "flash": true },   "spawners": [     { "sprite": "hail", "every": 0.34, "jitter": 0.15, "count": 3, "spread": 110, "props": { "speed": 130 } },     { "sprite": "icicle", "from": 0.1, "every": 1.5, "jitter": 0.5, "props": { "speed": 210 } },     { "sprite": "barrier", "from": 0.15, "every": 5, "jitter": 0.7, "props": { "style": "ice", "gap": 155 } },     { "sprite": "bolt", "from": 0.5, "every": 7, "jitter": 2, "props": { "warn": 0.85, "strike": 0.28, "width": 32 } },     { "sprite": "sticker", "every": 9, "jitter": 2 }   ] } ,{   "id": 9,   "name": "Thorn Updraft",   "subtitle": "Seeds that travel by puncture",   "hint": "Green updraft columns give you altitude for free. Burrs spiral, so do not chase them.",   "targetAltitude": 1750,   "climb": 56,   "scroll": 160,   "startStickers": 3,   "wind": { "base": -25, "gust": 110, "period": 4 },   "theme": { "sky": ["#5c8f6a", "#dff0d8"], "light": "day", "sun": true, "particles": "dust", "cloudBands": 4, "flash": false },   "spawners": [     { "sprite": "burr", "every": 0.85, "jitter": 0.3, "count": 2, "spread": 120, "props": { "speed": 60, "sway": { "amp": 95, "freq": 0.85 } } },     { "sprite": "twig", "every": 2, "jitter": 0.6, "props": { "speed": 90, "drift": 55 } },     { "sprite": "updraft", "every": 6, "jitter": 1.5, "props": { "speed": -30, "lift": 55 } },     { "sprite": "barrier", "from": 0.12, "every": 4.8, "jitter": 0.7, "props": { "style": "thorn", "gap": 150 } },     { "sprite": "sticker", "every": 8.5, "jitter": 2 }   ] } ,{   "id": 10,   "name": "Drone Corridor",   "subtitle": "Restricted airspace, apparently",   "hint": "Drones track your side of the screen. Fake one way, then go the other.",   "targetAltitude": 1900,   "climb": 58,   "scroll": 170,   "startStickers": 3,   "wind": { "base": 15, "gust": 70, "period": 5 },   "theme": { "sky": ["#3d4a63", "#9fb6c9"], "light": "dusk", "sun": false, "particles": "dust", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "drone", "every": 1.7, "jitter": 0.5, "props": { "speed": 70, "chase": 55 } },     { "sprite": "spark", "every": 0.7, "jitter": 0.3, "count": 2, "spread": 100, "props": { "speed": 145 } },     { "sprite": "barrier", "from": 0.1, "every": 4.4, "jitter": 0.6, "props": { "style": "laser", "gap": 150 } },     { "sprite": "bolt", "from": 0.45, "every": 6.5, "jitter": 1.5, "props": { "warn": 0.8, "strike": 0.28, "width": 34 } },     { "sprite": "sticker", "every": 8.5, "jitter": 2 }   ] } ,{   "id": 11,   "name": "Meteor Shower",   "subtitle": "Make a wish, then move",   "hint": "Meteors arrive fast and diagonal. Watch the angle, not the rock.",   "targetAltitude": 2050,   "climb": 59,   "scroll": 180,   "startStickers": 3,   "wind": { "base": -35, "gust": 120, "period": 4 },   "theme": { "sky": ["#141c33", "#3a4a72"], "light": "night", "sun": false, "particles": "stars", "cloudBands": 3, "flash": false },   "spawners": [     { "sprite": "meteor", "every": 0.85, "jitter": 0.3, "props": { "speed": 230, "drift": 150 } },     { "sprite": "meteor", "every": 1.1, "jitter": 0.4, "props": { "speed": 230, "drift": -150 } },     { "sprite": "hail", "every": 0.6, "jitter": 0.25, "count": 2, "spread": 110, "props": { "speed": 120 } },     { "sprite": "barrier", "from": 0.15, "every": 5, "jitter": 0.7, "props": { "style": "ice", "gap": 150 } },     { "sprite": "updraft", "every": 8, "jitter": 2, "props": { "speed": -30, "lift": 50 } },     { "sprite": "sticker", "every": 8, "jitter": 2 }   ] } ,{   "id": 12,   "name": "Edge of Space",   "subtitle": "Thin air, sharp everything",   "hint": "Everything at once. The only rule left is: never stop moving sideways.",   "targetAltitude": 2300,   "climb": 60,   "scroll": 195,   "startStickers": 3,   "wind": { "base": 0, "gust": 175, "period": 3.2 },   "theme": { "sky": ["#0a1030", "#2b1b4d"], "light": "night", "sun": false, "particles": "stars", "cloudBands": 2, "flash": true },   "spawners": [     { "sprite": "shard", "every": 0.5, "jitter": 0.2, "count": 2, "spread": 120, "props": { "speed": 150, "sway": { "amp": 55, "freq": 1.1 } } },     { "sprite": "meteor", "every": 1.3, "jitter": 0.4, "props": { "speed": 250, "drift": 170 } },     { "sprite": "orb", "every": 2.4, "jitter": 0.6, "props": { "speed": 60, "chase": 70 } },     { "sprite": "bolt", "every": 3.4, "jitter": 0.7, "count": 2, "spread": 240, "props": { "warn": 0.75, "strike": 0.3, "width": 34 } },     { "sprite": "barrier", "every": 4.2, "jitter": 0.5, "props": { "style": "laser", "gap": 145 } },     { "sprite": "updraft", "every": 7, "jitter": 1.5, "props": { "speed": -30, "lift": 55 } },     { "sprite": "sticker", "every": 7.5, "jitter": 1.5 }   ] } ] ;
+
+let LEVELS = EMBEDDED_LEVELS.slice();
+
+/* The shared build sets this to true: there is no levels/ directory next to a
+   published page, so it plays from the baked-in copy and skips the fetch. */
+const EMBEDDED_ONLY = true;
+
+async function loadLevels() {
+  if (EMBEDDED_ONLY || !/^https?:$/.test(location.protocol)) return;
+  try {
+    const idx = await fetch('levels/index.json').then(r => r.json());
+    const files = await Promise.all(idx.levels.map(f => fetch('levels/' + f).then(r => r.json())));
+    if (files.length) LEVELS = files.sort((a, b) => a.id - b.id);
+  } catch (e) {
+    console.info('Using embedded levels (' + e.message + ')');
+  }
+}
+
+/* ------------------------------------------------------------------ input */
+const Input = {
+  x: 0, y: 0, keys: {}, pointer: null,
+  init() {
+    addEventListener('keydown', e => {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
+      this.keys[e.key.toLowerCase()] = true;
+      if (e.key === 'Escape' || e.key.toLowerCase() === 'p') UI.togglePause();
+      if (e.key.toLowerCase() === 'm') UI.toggleMute();
+    });
+    addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
+    addEventListener('blur', () => { this.keys = {}; });
+
+    const stage = $('app');
+    const toWorld = ev => {
+      const r = stage.getBoundingClientRect();
+      return ((ev.clientX - r.left) / r.width) * W;
+    };
+    stage.addEventListener('pointerdown', ev => {
+      if (ev.target.closest('.screen') || ev.target.closest('.btn-icon')) return;
+      this.pointer = toWorld(ev); stage.setPointerCapture(ev.pointerId);
+    });
+    stage.addEventListener('pointermove', ev => { if (this.pointer != null) this.pointer = toWorld(ev); });
+    ['pointerup', 'pointercancel'].forEach(t => stage.addEventListener(t, () => { this.pointer = null; }));
+  },
+  read() {
+    let x = 0, y = 0;
+    if (this.keys['arrowleft'] || this.keys['a']) x -= 1;
+    if (this.keys['arrowright'] || this.keys['d']) x += 1;
+    if (this.keys['arrowup'] || this.keys['w']) y -= 1;
+    if (this.keys['arrowdown'] || this.keys['s']) y += 1;
+    if (this.pointer != null && Game.player) {
+      const d = this.pointer - Game.player.x;
+      x = clamp(d / 90, -1, 1);
+    }
+    this.x = x; this.y = y;
+  }
+};
+
+/* --------------------------------------------------------------------- UI */
+const UI = {
+  screen: 'scTitle', current: 0, toastT: 0,
+
+  show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+    this.screen = id;
+    this.hudOn(id === null);
+  },
+  hide() { document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); this.screen = null; },
+  hudOn(v) { $('hud').classList.toggle('on', !!v); },
+
+  toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  },
+
+  /* ---------------------------------------------------------- balloon -- */
+  buildPicker() {
+    const sw = $('swatches'); sw.innerHTML = '';
+    COLOURS.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'sw' + (c.id === Save.data.colour ? ' sel' : '');
+      b.style.background = 'radial-gradient(circle at 34% 30%,' + c.hi + ',' + c.mid + ' 58%,' + c.lo + ')';
+      b.title = c.name;
+      b.onclick = () => { Save.data.colour = c.id; Save.write(); Sound.ui(); this.buildPicker(); };
+      sw.appendChild(b);
+    });
+    const tw = $('types'); tw.innerHTML = '';
+    TYPES.forEach(t => {
+      const d = document.createElement('button');
+      d.className = 'type' + (t.id === Save.data.type ? ' sel' : '');
+      d.innerHTML = '<svg viewBox="-50 -100 100 116">' + balloonMarkup(t.id, Save.data.colour, {}) + '</svg>' +
+        '<b>' + t.name + '</b><span>' + (t.stickers ? '+1 sticker' : 'r ' + t.r) + '</span>';
+      d.onclick = () => { Save.data.type = t.id; Save.write(); Sound.ui(); this.buildPicker(); };
+      tw.appendChild(d);
+    });
+    $('typeDesc').textContent = typeOf(Save.data.type).desc;
+    $('titleBalloon').innerHTML = balloonMarkup(Save.data.type, Save.data.colour, { scale: 1.15 });
+    $('titleBalloon').setAttribute('transform', 'translate(60,116)');
+  },
+
+  /* ---------------------------------------------------------- levels --- */
+  buildLevels() {
+    const grid = $('levelGrid'); grid.innerHTML = '';
+    LEVELS.forEach((L, i) => {
+      const locked = (i + 1) > Save.data.unlocked;
+      const b = document.createElement('button');
+      b.className = 'lv' + (locked ? ' locked' : '');
+      const best = Save.data.best[L.id];
+      b.innerHTML = '<div class="n">' + String(i + 1).padStart(2, '0') + '</div>' +
+        '<div class="t">' + (locked ? 'Locked' : L.name) + '</div>' +
+        '<div class="s">' + (locked ? '&#128274;' : (best ? 'best ' + best : L.targetAltitude + ' m')) + '</div>' +
+        (best ? '<div class="star">&#11088;</div>' : '');
+      if (!locked) b.onclick = () => { Sound.init(); Sound.ui(); this.brief(i); };
+      grid.appendChild(b);
+    });
+  },
+
+  brief(i) {
+    this.current = i;
+    const L = LEVELS[i];
+    $('briefNo').textContent = 'Level ' + String(i + 1).padStart(2, '0');
+    $('briefName').textContent = L.name;
+    $('briefSub').textContent = L.subtitle || '';
+    $('briefAlt').textContent = L.targetAltitude + ' m';
+    const w = L.wind || {};
+    const strength = Math.abs(w.base || 0) + (w.gust || 0);
+    $('briefWind').textContent = strength < 15 ? 'calm' : strength < 60 ? 'light' :
+      strength < 110 ? 'brisk' : strength < 160 ? 'strong' : 'violent';
+    const haz = [...new Set((L.spawners || []).map(s => SPRITE_LABEL[s.sprite] || s.sprite))]
+      .filter(h => h !== 'stickers' && h !== 'cloud');
+    $('briefHaz').textContent = haz.join(', ');
+    $('briefHint').textContent = L.hint || '';
+    this.show('scBrief');
+  },
+
+  play(i) {
+    this.current = i;
+    this.hide();
+    Game.start(LEVELS[i]);
+    this.buildStickerPips();
+  },
+
+  buildStickerPips() {
+    const row = $('stickerRow'); row.innerHTML = '';
+    for (let i = 0; i < Game.maxStickers; i++) {
+      const d = document.createElement('div');
+      d.className = 'sticker-pip';
+      row.appendChild(d);
+    }
+    this.syncStickers();
+  },
+  syncStickers() {
+    const pips = $('stickerRow').children;
+    for (let i = 0; i < pips.length; i++)
+      pips[i].classList.toggle('spent', i >= Game.stickers);
+  },
+
+  syncHud(prog, speedFrac) {
+    $('hudLevel').textContent = 'Level ' + String(this.current + 1).padStart(2, '0') + ' - ' + Game.level.name;
+    $('hudAlt').textContent = Math.round(Game.alt) + ' / ' + Game.level.targetAltitude + ' m';
+    $('hudScore').textContent = Math.round(Game.score);
+    if (prog != null) $('altFill').style.height = (prog * 100).toFixed(1) + '%';
+    if (speedFrac != null) $('speedFill').style.width = clamp(speedFrac * 100, 0, 100).toFixed(0) + '%';
+  },
+
+  togglePause() {
+    if (Game.over) return;
+    if (Game.running) {
+      Game.running = false;
+      $('pauseHint').textContent = Game.level.hint || '';
+      this.show('scPause');
+    } else if (this.screen === 'scPause') {
+      this.hide();
+      Game.running = true;
+      this.hudOn(true);
+    }
+  },
+
+  toggleMute() {
+    const on = Sound.toggle();
+    $('btnMute').innerHTML = on ? '&#128266;' : '&#128263;';
+  },
+
+  win(bonus, stickBonus) {
+    const L = LEVELS[this.current];
+    const isLast = this.current >= LEVELS.length - 1;
+    $('winTitle').textContent = isLast ? 'You made it to the edge' : 'Altitude reached';
+    $('winSub').textContent = isLast
+      ? 'Nothing left above you but vacuum. Well flown.'
+      : L.name + ' is behind you.';
+    $('winAlt').textContent = Math.round(Game.alt) + ' m';
+    $('winStick').textContent = Game.stickers + '  (+' + stickBonus + ')';
+    $('winBonus').textContent = '+' + bonus;
+    $('winScore').textContent = Math.round(Game.score);
+    const isBest = Save.setBest(L.id, Math.round(Game.score));
+    $('winBest').textContent = Save.data.best[L.id] + (isBest ? '  (new)' : '');
+    Save.unlock(this.current + 2);
+    $('btnNext').style.display = isLast ? 'none' : '';
+    this.show('scWin');
+    this.buildLevels();
+  },
+
+  lose() {
+    const L = LEVELS[this.current];
+    $('loseSub').textContent = Game.lastReason ? 'You were ' + Game.lastReason + '.' : 'The atmosphere won that one.';
+    $('loseAlt').textContent = Math.round(Game.alt) + ' / ' + L.targetAltitude + ' m';
+    $('loseScore').textContent = Math.round(Game.score);
+    $('loseHint').textContent = L.hint || '';
+    this.show('scLose');
+  },
+
+  quit() {
+    Game.stop();
+    this.buildLevels();
+    this.show('scLevels');
+  },
+
+  bind() {
+    const go = (id, fn) => { $(id).onclick = () => { Sound.init(); Sound.resume(); Sound.ui(); fn(); }; };
+    go('btnPlay', () => { this.buildPicker(); this.show('scPick'); });
+    go('btnHow', () => this.show('scHow'));
+    go('btnHowBack', () => this.show('scTitle'));
+    go('btnPickBack', () => this.show('scTitle'));
+    go('btnPickGo', () => { this.buildLevels(); this.show('scLevels'); });
+    go('btnLevelsBack', () => { this.buildPicker(); this.show('scPick'); });
+    go('btnReset', () => { Save.reset(); this.buildLevels(); this.toast('progress reset'); });
+    go('btnBriefBack', () => this.show('scLevels'));
+    go('btnBriefGo', () => this.play(this.current));
+    go('btnResume', () => this.togglePause());
+    go('btnQuit', () => this.quit());
+    go('btnNext', () => { this.brief(Math.min(this.current + 1, LEVELS.length - 1)); });
+    go('btnWinLevels', () => this.quit());
+    go('btnRetry', () => this.play(this.current));
+    go('btnLoseLevels', () => this.quit());
+    $('btnPause').onclick = () => this.togglePause();
+    $('btnMute').onclick = () => { Sound.init(); this.toggleMute(); };
+  }
+};
+
+/* ------------------------------------------------------------- main loop */
+let last = 0;
+function frame(ts) {
+  const dt = Math.min(0.05, (ts - last) / 1000 || 0);
+  last = ts;
+  Input.read();
+  Game.tick(dt);
+  requestAnimationFrame(frame);
+}
+
+(async function boot() {
+  Save.load();
+  ensureBalloonGradients();
+  await loadLevels();
+  Input.init();
+  UI.bind();
+  UI.buildPicker();
+  UI.buildLevels();
+  requestAnimationFrame(frame);
+})();
+</script>
+<style>
+  /* sprite animations (SVG classes, applied by the sprite registry) */
+  .flap{transform-box:fill-box; transform-origin:center; animation:flap .34s infinite alternate ease-in-out}
+  @keyframes flap{from{transform:scaleY(.72)}to{transform:scaleY(1)}}
+  .spin1,.spin2{transform-box:fill-box; transform-origin:center; animation:rotor .18s infinite linear}
+  .spin2{animation-duration:.15s}
+  @keyframes rotor{from{transform:scaleX(1)}50%{transform:scaleX(.15)}to{transform:scaleX(1)}}
+  .bob{transform-box:fill-box; transform-origin:center; animation:bob 1.2s infinite ease-in-out}
+  @keyframes bob{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+  .warn{animation:warnpulse .3s infinite alternate ease-in-out}
+  @keyframes warnpulse{from{opacity:.45}to{opacity:1}}
+</style>

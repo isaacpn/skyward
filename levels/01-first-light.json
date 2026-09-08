@@ -1,0 +1,24 @@
+{
+  "id": 1,
+  "name": "First Light",
+  "subtitle": "Clear skies, gentle lift",
+  "hint": "Steer with the arrow keys (or A / D). Moving sideways fast makes you climb faster.",
+  "targetAltitude": 750,
+  "climb": 54,
+  "scroll": 85,
+  "startStickers": 3,
+  "wind": { "base": 0, "gust": 0, "period": 10 },
+  "theme": {
+    "sky": ["#6ec6f2", "#dff4ff"],
+    "light": "day",
+    "sun": true,
+    "particles": "none",
+    "cloudBands": 3,
+    "flash": false
+  },
+  "spawners": [
+    { "sprite": "bird", "every": 2.4, "jitter": 0.9, "props": { "speed": 26, "sway": { "amp": 30, "freq": 0.45 } } },
+    { "sprite": "cloud", "every": 3.2, "jitter": 1.6, "props": { "speed": -25 } },
+    { "sprite": "sticker", "every": 12, "jitter": 3 }
+  ]
+}

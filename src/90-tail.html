@@ -1,0 +1,15 @@
+</script>
+<style>
+  /* sprite animations (SVG classes, applied by the sprite registry) */
+  .flap{transform-box:fill-box; transform-origin:center; animation:flap .34s infinite alternate ease-in-out}
+  @keyframes flap{from{transform:scaleY(.72)}to{transform:scaleY(1)}}
+  .spin1,.spin2{transform-box:fill-box; transform-origin:center; animation:rotor .18s infinite linear}
+  .spin2{animation-duration:.15s}
+  @keyframes rotor{from{transform:scaleX(1)}50%{transform:scaleX(.15)}to{transform:scaleX(1)}}
+  .bob{transform-box:fill-box; transform-origin:center; animation:bob 1.2s infinite ease-in-out}
+  @keyframes bob{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+  .warn{animation:warnpulse .3s infinite alternate ease-in-out}
+  @keyframes warnpulse{from{opacity:.45}to{opacity:1}}
+</style>
+</body>
+</html>

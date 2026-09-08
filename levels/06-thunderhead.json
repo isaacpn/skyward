@@ -1,0 +1,19 @@
+{
+  "id": 6,
+  "name": "Thunderhead",
+  "subtitle": "The light goes green and the air goes still",
+  "hint": "A white column means a bolt is coming. Be anywhere else.",
+  "targetAltitude": 1350,
+  "climb": 57,
+  "scroll": 130,
+  "startStickers": 3,
+  "wind": { "base": -20, "gust": 90, "period": 6 },
+  "theme": { "sky": ["#4a5a72", "#93a8bd"], "light": "storm", "sun": false, "particles": "rain", "cloudBands": 5, "flash": true },
+  "spawners": [
+    { "sprite": "hail", "every": 0.7, "jitter": 0.3, "count": 2, "spread": 80, "props": { "speed": 105 } },
+    { "sprite": "bolt", "from": 0.15, "every": 5.5, "jitter": 1.4, "props": { "warn": 1.05, "strike": 0.3, "width": 30 } },
+    { "sprite": "gust", "every": 6, "jitter": 1.5, "props": { "speed": 15, "push": 240 } },
+    { "sprite": "barrier", "from": 0.3, "every": 6.5, "jitter": 1, "props": { "style": "hail", "gap": 175 } },
+    { "sprite": "sticker", "every": 9.5, "jitter": 2.5 }
+  ]
+}

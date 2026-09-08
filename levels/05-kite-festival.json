@@ -1,0 +1,19 @@
+{
+  "id": 5,
+  "name": "Kite Festival",
+  "subtitle": "Beautiful. Also: glass-coated string.",
+  "hint": "Kite lines cut. The gap in a line is narrow, so build speed before you go.",
+  "targetAltitude": 1250,
+  "climb": 57,
+  "scroll": 125,
+  "startStickers": 3,
+  "wind": { "base": 25, "gust": 80, "period": 6.5 },
+  "theme": { "sky": ["#4fb0e8", "#ffeed6"], "light": "day", "sun": true, "particles": "pollen", "cloudBands": 3, "flash": false },
+  "spawners": [
+    { "sprite": "kite", "every": 2.2, "jitter": 0.6, "props": { "speed": 45, "drift": 35, "sway": { "amp": 40, "freq": 0.7 } } },
+    { "sprite": "barrier", "from": 0.12, "every": 5.2, "jitter": 0.8, "props": { "style": "string", "gap": 165 } },
+    { "sprite": "bird", "every": 3, "jitter": 0.9, "props": { "speed": 44, "drift": -50 } },
+    { "sprite": "leaf", "every": 1.4, "jitter": 0.6, "count": 2, "spread": 70, "props": { "speed": 26, "push": 70 } },
+    { "sprite": "sticker", "every": 10, "jitter": 2.5 }
+  ]
+}
